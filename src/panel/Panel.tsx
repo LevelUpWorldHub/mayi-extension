@@ -77,6 +77,13 @@ function forYou(item: ConflictItem): string | null {
   return null;
 }
 
+function severityLabel(severity: ConflictItem["severity"]): string {
+  if (severity === "conflict") return "Files and contract disagree";
+  if (severity === "tension") return "The permission is narrow";
+  if (severity === "aligned") return "Files and contract agree";
+  return "One side is silent";
+}
+
 function severityClass(severity: ConflictItem["severity"]): string {
   if (severity === "conflict") return "border-seal/40 bg-[#f8e4dc] text-seal";
   if (severity === "tension") return "border-conditional/40 bg-[#f6ead2] text-conditional";
@@ -88,6 +95,8 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   const [tab, setTab] = useState<Tab>("ask");
   const [question, setQuestion] = useState("May I ");
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [shownClause, setShownClause] = useState(false);
+  const [copiedQuote, setCopiedQuote] = useState<string | null>(null);
   const siteKey = snapshot?.pageUrl ?? "";
   const [seenSite, setSeenSite] = useState(siteKey);
   if (seenSite !== siteKey) {
@@ -95,6 +104,8 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
     setAnswers([]);
     setQuestion("May I ");
     setTab("ask");
+    setShownClause(false);
+    setCopiedQuote(null);
   }
   const [asking, setAsking] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
@@ -102,6 +113,7 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   const [cardError, setCardError] = useState<string | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
   const [replaying, setReplaying] = useState(false);
+  const askRef = useRef<HTMLInputElement | null>(null);
 
   const report = useMemo(
     () => (snapshot ? detectConflicts(snapshot.signals, snapshot.policies) : null),
@@ -120,6 +132,18 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   useEffect(() => {
     latestRef.current?.scrollIntoView({ block: "nearest" });
   }, [answers[0]?.id]);
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const tag = (event.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      event.preventDefault();
+      setTab("ask");
+      askRef.current?.focus();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   async function ask(text: string, presetId?: string) {
     if (!snapshot || !text.trim()) return;
@@ -229,13 +253,27 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
             </Button>
           ) : null}
         </div>
+        <ol className="beats" aria-label="Demo beats">
+          {[
+            { label: "Banner", done: Boolean(report?.primary) },
+            { label: "Answer", done: answers.length > 0 },
+            { label: "Clause", done: shownClause },
+          ].map((step, index) => (
+            <li key={step.label} data-done={step.done ? "true" : "false"}>
+              <span>{index + 1}</span>
+              {step.label}
+            </li>
+          ))}
+        </ol>
+        <p id="mayi-ask-hint" className="mt-2 text-xs text-muted" aria-live="polite">
+          Press / to ask.
+          {shownClause ? <span className="ml-2 font-semibold text-yes">Highlighted on the policy page.</span> : null}
+        </p>
       </header>
 
       {report?.primary ? (
         <div className={`mx-4 mt-3 rounded-2xl border px-3 py-3 ${severityClass(report.primary.severity)}`} role="status">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">
-            {report.primary.severity === "conflict" ? "Files and contract disagree" : report.primary.severity}
-          </p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">{severityLabel(report.primary.severity)}</p>
           <p className="mt-1 font-serif text-lg leading-snug">{report.primary.headline}</p>
           {forYou(report.primary) ? <p className="mt-1 text-sm font-semibold">{forYou(report.primary)}</p> : null}
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
@@ -249,8 +287,11 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
               {report.primary.policyQuote && report.primary.policyUrl ? (
                 <button
                   type="button"
-                  className="mt-2 font-semibold underline-offset-2 hover:underline"
-                  onClick={() => onShowClause(report.primary?.policyUrl as string, report.primary?.policyQuote as string)}
+                  className="linkish mt-2 text-seal"
+                  onClick={() => {
+                    setShownClause(true);
+                    onShowClause(report.primary?.policyUrl as string, report.primary?.policyQuote as string);
+                  }}
                 >
                   Show this clause
                 </button>
@@ -329,8 +370,11 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
               <input
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
+                ref={askRef}
                 aria-label="May I question"
-                className="h-10 min-w-0 flex-1 rounded-full border border-line bg-white/60 px-4 text-sm outline-none focus:border-ink"
+                aria-keyshortcuts="/"
+                aria-describedby="mayi-ask-hint"
+                className="h-10 min-w-0 flex-1 rounded-full border border-line bg-white/60 px-4 text-sm outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-seal"
               />
               <Button type="submit" variant="seal" disabled={Boolean(asking)}>
                 Ask
@@ -405,13 +449,34 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
                       <p className="mt-2 text-xs text-muted">No clause on the page matched this answer.</p>
                     )}
                     {answer.quote && answer.sourceUrl ? (
-                      <button
-                        type="button"
-                        className="mt-2 text-sm font-semibold text-seal underline-offset-2 hover:underline"
-                        onClick={() => onShowClause(answer.sourceUrl as string, answer.quote as string)}
-                      >
-                        Show this clause
-                      </button>
+                      <div className="mt-2 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          className="linkish text-seal"
+                          onClick={() => {
+                            setShownClause(true);
+                            onShowClause(answer.sourceUrl as string, answer.quote as string);
+                          }}
+                        >
+                          Show this clause
+                        </button>
+                        <button
+                          type="button"
+                          className="linkish"
+                          onClick={() => {
+                            const quote = answer.quote as string;
+                            void navigator.clipboard.writeText(quote).then(
+                              () => {
+                                setCopiedQuote(quote);
+                                window.setTimeout(() => setCopiedQuote(null), 1600);
+                              },
+                              () => setAskError("Couldn't copy that clause."),
+                            );
+                          }}
+                        >
+                          {copiedQuote === answer.quote ? "Copied" : "Copy clause"}
+                        </button>
+                      </div>
                     ) : null}
                     {answer.routeNote ? (
                       <p className="mt-2 rounded-xl border border-conditional/40 bg-[#f6ead2] px-3 py-2 text-xs text-conditional">

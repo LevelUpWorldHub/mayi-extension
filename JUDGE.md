@@ -136,6 +136,31 @@ Technical 9.5, Design 8, Impact 9, Idea 9. **Total 35.5.**
 
 **Total: 36 / 40.** Up 0.5. Design is still short of 9.5.
 
+## Round 6 — design and UX polish
+
+### Scores
+
+Technical 9.5, Design 8, Impact 9, Idea 9.5. **Total 36.**
+
+### Top 5 gaps
+
+1. The three beats were a raw uppercase line, easy to miss and easy to mistake for a status dump.
+2. Severity said "tension" and "aligned" in the engine's words.
+3. Sample chips repeated every mark, so the row wrapped into a second control bar.
+4. Show this clause and Copy clause had no focus ring.
+5. The shortcut hint disappeared the moment a clause was highlighted.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9.5 | Unchanged. |
+| Design | 9 | The beats are a numbered stepper. Severity uses plain labels. The selected sample keeps its mark; the others stay one line and scroll. Clause actions take a focus ring. The / hint stays put when the highlight confirms. |
+| Impact | 9 | Unchanged. |
+| Idea / originality | 9.5 | Unchanged. |
+
+**Total: 36.5 / 40.** Up 0.5. Design is not at 9.5 yet. Contrast, motion, and the demo path are still open.
+
 ## Round 4 — delight and demo moments
 
 ### Scores

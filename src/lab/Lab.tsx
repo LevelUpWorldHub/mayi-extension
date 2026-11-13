@@ -71,19 +71,23 @@ export function Lab() {
           <p className="font-serif text-xs uppercase tracking-[0.22em] text-seal">Lab · offline samples</p>
           <p className="max-w-xl text-sm text-muted">{sample.blurb}</p>
         </div>
-        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Sample sites">
-          {SAMPLES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              aria-pressed={item.id === sample.id}
-              className={`rounded-full px-3 py-1.5 text-left text-sm font-semibold ${item.id === sample.id ? "bg-ink text-paper" : "border border-line bg-white/50"}`}
-              onClick={() => setSample(item)}
-            >
-              <span className="block text-[10px] font-semibold uppercase tracking-wide opacity-70">{item.mark}</span>
-              {item.name}
-            </button>
-          ))}
+        <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Sample sites">
+          {SAMPLES.map((item) => {
+            const selected = item.id === sample.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={selected}
+                title={item.mark}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-seal ${selected ? "bg-ink text-paper" : "border border-line bg-white/50"}`}
+                onClick={() => setSample(item)}
+              >
+                {item.name}
+                {selected ? <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide opacity-70">{item.mark}</span> : null}
+              </button>
+            );
+          })}
         </div>
       </header>
       <div className="grid grid-cols-1 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(22rem,28rem)]">
