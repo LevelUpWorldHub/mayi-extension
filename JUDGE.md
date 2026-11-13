@@ -83,3 +83,44 @@ Technical 8, Design 8, Impact 9, Idea 9. **Total 34.**
 | Idea / originality | 9 | Unchanged. |
 
 **Total: 35 / 40.** Up 1. Design is the remaining short score. No high-severity technical gap left.
+
+## Round 4 — core correctness
+
+Mark raised the bar to 9.5 on every criterion, with a 12-round cap. Scores from here use half points. This round only changes whether a quote is a real span.
+
+### Scores
+
+Technical 9, Design 8, Impact 9, Idea 9. **Total 35.**
+
+### Top 5 gaps
+
+1. A model quote was searched across the whole policy, so a fuzzy hit could cite a sentence the model never saw.
+2. A bag-of-words fuzzy match accepted a shuffled sentence. The words were present. The clause was not.
+3. When the matcher missed, the extractive path still printed its own sentence as the quote.
+4. An HTML comment or an unclosed `<script>` could leak into the text MayI reads.
+5. A robots-shaped `ai.txt` with `Allow: /` was treated as permission to train.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9.5 | Model quotes have to be an exact or normalized span inside the excerpt that was sent, then again in the source page. Shuffled words do not match. A missed citation is not shown. Scripts and comments never become clauses. `Allow: /` in a robots-shaped ai.txt is not a training grant. |
+| Design | 8 | Unchanged. |
+| Impact | 9 | Unchanged. |
+| Idea / originality | 9 | Unchanged. |
+
+**Total: 35.5 / 40.** Up 0.5. Design is still the short score. No high-severity correctness gap left in citation.
+
+## Round 4 — delight and demo moments
+
+### Scores
+
+Technical 9, Design 8, Impact 9, Idea 9. **Total 35.**
+
+### Top 5 gaps
+
+1. Nothing marks the three beats a judge should hit: banner, answer, clause. The demo is a pile of controls.
+2. The clause cannot be copied. Showing it on the page is the proof; handing someone the sentence is the other half.
+3. The question field has no keyboard way in. A side panel should focus on `/`.
+4. Show this clause gives no confirmation, so a click that worked looks the same as a click that didn't.
+5. Sample chips are two lines tall, so the five sites compete with the banner.

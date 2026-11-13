@@ -60,9 +60,25 @@ function dice(left: string[], right: string[]): number {
   return (2 * overlap) / (left.length + right.length);
 }
 
+function inOrder(needles: string[], haystack: string[]): boolean {
+  let cursor = 0;
+  for (const token of needles) {
+    let found = -1;
+    for (let index = cursor; index < haystack.length; index += 1) {
+      if (haystack[index] === token) {
+        found = index;
+        break;
+      }
+    }
+    if (found < 0) return false;
+    cursor = found + 1;
+  }
+  return true;
+}
+
 export function locateQuote(documentText: string, quote: string): Citation {
   const needle = quote.trim();
-  if (needle.length < 12) return NONE;
+  if (needle.length < 8) return NONE;
 
   const exact = documentText.indexOf(needle);
   if (exact >= 0) {
@@ -74,6 +90,8 @@ export function locateQuote(documentText: string, quote: string): Citation {
       method: "exact",
     };
   }
+
+  if (needle.length < 12) return NONE;
 
   const hay = normalizeWithMap(documentText);
   const pin = normalizeWithMap(needle);
@@ -101,10 +119,10 @@ export function locateQuote(documentText: string, quote: string): Citation {
   for (const width of widths) {
     for (let index = 0; index <= docTokens.length - width; index += 1) {
       const window = docTokens.slice(index, index + width);
-      const score = dice(
-        quoteTokens.map((token) => token.token),
-        window.map((token) => token.token),
-      );
+      const quoteWords = quoteTokens.map((token) => token.token);
+      const windowWords = window.map((token) => token.token);
+      if (!inOrder(quoteWords, windowWords)) continue;
+      const score = dice(quoteWords, windowWords);
       if (!best || score > best.score) {
         best = { score, start: window[0].start, end: window[window.length - 1].end };
       }
@@ -118,6 +136,33 @@ export function locateQuote(documentText: string, quote: string): Citation {
     confidence: Number(best.score.toFixed(3)),
     method: "fuzzy",
   };
+}
+
+export function groundModelQuote(
+  excerpts: { title: string; url: string; text: string }[],
+  docs: { title: string; url: string; text: string }[],
+  quote: string,
+  sourceTitle: string,
+): { quote: string | null; url: string | null; title: string | null; citation: Citation | null } {
+  const blank = { quote: null, url: null, title: null, citation: null };
+  const needle = quote.trim();
+  if (needle.length < 8) return blank;
+  const ordered = [
+    ...excerpts.filter((excerpt) => excerpt.title === sourceTitle),
+    ...excerpts.filter((excerpt) => excerpt.title !== sourceTitle),
+  ];
+  for (const excerpt of ordered) {
+    const inExcerpt = locateQuote(excerpt.text, needle);
+    if (inExcerpt.method === "none" || inExcerpt.method === "fuzzy") continue;
+    const doc = docs.find((item) => item.url === excerpt.url) ?? docs.find((item) => item.title === excerpt.title);
+    if (!doc) {
+      return { quote: inExcerpt.matched, url: excerpt.url, title: excerpt.title, citation: inExcerpt };
+    }
+    const inDoc = locateQuote(doc.text, inExcerpt.matched);
+    if (inDoc.method === "none") continue;
+    return { quote: inDoc.matched, url: doc.url, title: doc.title, citation: inDoc };
+  }
+  return blank;
 }
 
 export function textFragmentUrl(url: string, quote: string): string {

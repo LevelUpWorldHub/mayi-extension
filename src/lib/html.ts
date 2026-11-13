@@ -32,16 +32,19 @@ export function decodeEntities(value: string): string {
 
 export function htmlToText(html: string): string {
   const withoutDanger = html
+    .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<svg[\s\S]*?<\/svg>/gi, " ");
+    .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
+    .replace(/<script\b[^>]*>[\s\S]*$/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*$/gi, " ");
   const withBreaks = withoutDanger
     .replace(/<(p|div|h1|h2|h3|h4|li|tr|section|article|blockquote|br)\b[^>]*>/gi, "\n")
     .replace(/<\/(p|div|h1|h2|h3|h4|li|tr|section|article|blockquote)>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, " ");
-  const decoded = decodeEntities(withBreaks)
+  const decoded = decodeEntities(decodeEntities(withBreaks))
     .replace(/\u00a0/g, " ")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n[ \t]+/g, "\n")

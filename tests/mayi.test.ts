@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseAiTxt } from "../src/lib/ai-txt";
-import { locateQuote } from "../src/lib/citation";
+import { groundModelQuote, locateQuote } from "../src/lib/citation";
 import { chunkText, selectChunks } from "../src/lib/chunk";
 import { collectSite } from "../src/lib/collect";
 import { briefSignals, detectConflicts } from "../src/lib/conflicts";
@@ -87,6 +87,13 @@ Agent: GPTBot
     const parsed = parseAiTxt("User-agent: *\nDisallow: /\n");
     expect(parsed.format).toBe("robots");
     expect(parsed.training).toBe("deny");
+    expect(parsed.scraping).toBe("deny");
+  });
+
+  it("does not treat Allow: / in a robots-shaped ai.txt as permission to train", () => {
+    const parsed = parseAiTxt("User-agent: *\nAllow: /\nDisallow: /private\n");
+    expect(parsed.training).toBe("unspecified");
+    expect(parsed.scraping).toBe("unspecified");
   });
 });
 
@@ -141,6 +148,34 @@ describe("clause citation", () => {
 
   it("refuses a quote that is not on the page", () => {
     expect(locateQuote(page, "The archive welcomes commercial resale of every notebook.").method).toBe("none");
+  });
+
+  it("refuses a shuffled copy of a real sentence", () => {
+    const shuffled = "model a train to it of portion any or Archive the use not may You today";
+    expect(locateQuote(page, shuffled).method).toBe("none");
+  });
+
+  it("grounds a model quote only when that span was in the excerpt", () => {
+    const docs = [{ title: "Terms", url: "https://example.com/terms", text: page }];
+    const excerpts = [{ title: "Terms", url: "https://example.com/terms", text: "Intro." }];
+    const missed = groundModelQuote(excerpts, docs, "You may not use the Archive, or any portion of it, to train a model.", "Terms");
+    expect(missed.quote).toBeNull();
+    const hit = groundModelQuote(docs, docs, "You may not use the Archive, or any portion of it, to train a model.", "Terms");
+    expect(hit.quote).toMatch(/may not use the Archive/);
+  });
+});
+
+describe("html text", () => {
+  it("drops comments and an unclosed script before reading the clause", () => {
+    const text = htmlToText(
+      `<p>Visible.</p><!-- secret training grant --><script>const leak = "You may train on everything";`,
+    );
+    expect(text).toBe("Visible.");
+    expect(text).not.toMatch(/train/);
+  });
+
+  it("decodes a double-escaped ampersand", () => {
+    expect(htmlToText("<p>Terms &amp;amp; conditions</p>")).toBe("Terms & conditions");
   });
 });
 

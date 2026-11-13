@@ -99,15 +99,19 @@ export function answerWithIntent(intent: Intent, docs: PolicyDoc[], inferenceDet
   );
   const sameVerdict = ranked.filter((item) => item.verdict === verdict);
   const supporting = sameVerdict.find((item) => item.text.length <= 320) ?? sameVerdict[0] ?? top;
-  const citation = locateQuote(supporting.doc.text, supporting.text);
+  const matched = supporting.doc.text.slice(supporting.start, supporting.end);
+  const citation = locateQuote(supporting.doc.text, matched);
   return {
     id: crypto.randomUUID(),
     question: intent.question,
     presetId: intent.id,
     tone: intent.tone,
-    verdict,
-    reason: reasonFor(intent, verdict, supporting.text, supporting.doc.title),
-    quote: citation.method === "none" ? supporting.text : citation.matched,
+    verdict: citation.method === "none" ? "unknown" : verdict,
+    reason:
+      citation.method === "none"
+        ? intent.fallback.unknown.replaceAll("{doc}", supporting.doc.title)
+        : reasonFor(intent, verdict, matched, supporting.doc.title),
+    quote: citation.method === "none" ? null : citation.matched,
     sourceUrl: supporting.doc.url,
     sourceTitle: supporting.doc.title,
     citation: citation.method === "none" ? null : citation,
@@ -137,7 +141,7 @@ export function answerFreeform(question: string, docs: PolicyDoc[], inferenceDet
       }),
     )
     .filter((item) => item.hits > 0)
-    .sort((left, right) => right.hits - left.hits || right.text.length - left.text.length);
+    .sort((left, right) => right.hits - left.hits || left.text.length - right.text.length);
 
   const best = ranked[0];
   const tone: QuestionTone = "permission";
@@ -161,7 +165,8 @@ export function answerFreeform(question: string, docs: PolicyDoc[], inferenceDet
   if (FREEFORM_CONDITIONAL.test(best.text)) verdict = "conditional";
   else if (FREEFORM_DENY.test(best.text)) verdict = "no";
   else if (FREEFORM_ALLOW.test(best.text)) verdict = "yes";
-  const citation = locateQuote(best.doc.text, best.text);
+  const matched = best.doc.text.slice(best.start, best.end);
+  const citation = locateQuote(best.doc.text, matched);
   const reason =
     verdict === "yes"
       ? `The ${best.doc.title} looks like it allows this.`
@@ -170,14 +175,15 @@ export function answerFreeform(question: string, docs: PolicyDoc[], inferenceDet
         : verdict === "conditional"
           ? `The ${best.doc.title} allows this only with a condition.`
           : `The closest clause is in the ${best.doc.title}, and it does not say clearly.`;
+  const grounded = citation.method !== "none";
   return {
     id: crypto.randomUUID(),
     question,
     presetId: null,
     tone,
-    verdict,
-    reason,
-    quote: citation.method === "none" ? best.text : citation.matched,
+    verdict: grounded ? verdict : "unknown",
+    reason: grounded ? reason : "MayI couldn't find that clause on the page.",
+    quote: grounded ? citation.matched : null,
     sourceUrl: best.doc.url,
     sourceTitle: best.doc.title,
     citation: citation.method === "none" ? null : citation,

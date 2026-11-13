@@ -15,7 +15,7 @@ import {
 } from "firebase/ai";
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { CLOUD_CHAR_BUDGET, LONG_DOCUMENT_CHARS, ON_DEVICE_CHAR_BUDGET } from "./budgets";
-import { locateQuote } from "./citation";
+import { groundModelQuote, locateQuote } from "./citation";
 import { selectChunks, type RankedExcerpt } from "./chunk";
 import { shouldRetryInCloud } from "./route";
 import { classifySentence } from "./extractive";
@@ -214,18 +214,15 @@ async function generate(
   return { parsed, inference: sourceOf(result.response.inferenceSource) };
 }
 
-function cite(parsed: ModelJson, docs: PolicyDoc[]): { doc: PolicyDoc | null; quote: string | null } {
-  if (!parsed.quote) return { doc: null, quote: null };
-  const ordered = [
-    ...docs.filter((doc) => doc.title === parsed.sourceTitle),
-    ...docs.filter((doc) => doc.title !== parsed.sourceTitle),
-  ];
-  for (const doc of ordered) {
-    const located = locateQuote(doc.text, parsed.quote);
-    if (located.method === "none") continue;
-    return { doc, quote: located.matched };
-  }
-  return { doc: null, quote: null };
+function cite(
+  parsed: ModelJson,
+  docs: PolicyDoc[],
+  excerpts: RankedExcerpt[],
+): { doc: PolicyDoc | null; quote: string | null } {
+  const grounded = groundModelQuote(excerpts, docs, parsed.quote, parsed.sourceTitle);
+  if (!grounded.quote) return { doc: null, quote: null };
+  const doc = docs.find((item) => item.url === grounded.url) ?? null;
+  return { doc, quote: grounded.quote };
 }
 
 export async function askFirebase(options: {
@@ -253,7 +250,7 @@ export async function askFirebase(options: {
           : "Cloud — Gemini Nano isn't available in this browser, so Firebase used the cloud model."
         : "Firebase answered, and did not say whether Nano or the cloud ran it.";
 
-  let cited = cite(parsed, options.docs);
+  let cited = cite(parsed, options.docs, onDeviceExcerpts);
   const retry = shouldRetryInCloud({
     totalChars: total,
     onDeviceExcerpt: onDeviceExcerpts.map((excerpt) => excerpt.text).join("\n"),
@@ -261,14 +258,11 @@ export async function askFirebase(options: {
     verdict: parsed.verdict,
   });
   if (retry) {
-    const second = await generate(
-      InferenceMode.ONLY_IN_CLOUD,
-      options.question,
-      selectChunks(options.docs, options.question, CLOUD_CHAR_BUDGET),
-    );
+    const cloudExcerpts = selectChunks(options.docs, options.question, CLOUD_CHAR_BUDGET);
+    const second = await generate(InferenceMode.ONLY_IN_CLOUD, options.question, cloudExcerpts);
     parsed = second.parsed;
     inference = "cloud";
-    cited = cite(parsed, options.docs);
+    cited = cite(parsed, options.docs, cloudExcerpts);
     detail = "Cloud — labeled because the on-device excerpt did not contain a clause MayI could cite, and the policy is long.";
   }
 
