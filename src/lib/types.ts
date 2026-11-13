@@ -58,4 +58,9 @@ export interface Answer {
   inferenceDetail: string;
   /** Set when a long policy's on-device excerpt misses the cited clause. */
   routeNote?: string | null;
+  /** From GenerativeModel.countTokens, when Firebase answered. */
+  promptTokens?: number | null;
+  /** From response.usageMetadata, when Firebase answered. */
+  outputTokens?: number | null;
+  hybridMode?: "prefer_on_device" | "only_on_device" | "only_in_cloud" | "prefer_in_cloud";
 }

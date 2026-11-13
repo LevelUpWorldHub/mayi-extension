@@ -111,6 +111,31 @@ Technical 9, Design 8, Impact 9, Idea 9. **Total 35.**
 
 **Total: 35.5 / 40.** Up 0.5. Design is still the short score. No high-severity correctness gap left in citation.
 
+## Round 5 — Firebase AI Logic hybrid depth
+
+### Scores
+
+Technical 9.5, Design 8, Impact 9, Idea 9. **Total 35.5.**
+
+### Top 5 gaps
+
+1. The call used `PREFER_ON_DEVICE` and `ONLY_IN_CLOUD` only. `ONLY_ON_DEVICE` and `PREFER_IN_CLOUD` were never selected.
+2. `countTokens` was unused, so the on-device budget was a character guess.
+3. On-device calls had no `responseConstraint`, no system prompt, and no language expectation. Cloud calls had no safety settings, no system instruction, and no thinking level.
+4. A bad JSON reply was thrown away. `startChat` could have asked once for the object.
+5. The answer did not keep `usageMetadata` or the mode that actually ran.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9.5 | Held. The path now calls `countTokens`, `initializeDeviceModel`, `generateContentStream` (with `generateContent` if the stream fails), `startChat` plus one repair turn and `getHistory`, and all four `InferenceMode` values. On-device params carry a JSON response constraint and a system prompt. Cloud params carry the same instruction, `BLOCK_ONLY_HIGH` safety settings, and `ThinkingLevel.MINIMAL`. Token counts land on the answer. |
+| Design | 8 | Unchanged. |
+| Impact | 9 | Unchanged. The token counts are stored and not yet the story on the card. |
+| Idea / originality | 9.5 | The hybrid decision is now a real fork: Nano only when it is ready and the prompt fits, cloud only when the excerpt missed the clause or the token count does not fit, cloud-preferred after Nano fails. That is the hackathon idea, expressed as code rather than a badge. |
+
+**Total: 36 / 40.** Up 0.5. Design is still short of 9.5.
+
 ## Round 4 — delight and demo moments
 
 ### Scores

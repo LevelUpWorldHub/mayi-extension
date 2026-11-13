@@ -10,6 +10,7 @@ import { diffPolicies } from "../src/lib/diff";
 import { answerExtractive } from "../src/lib/extractive";
 import { htmlToText } from "../src/lib/html";
 import { parseLlmsTxt } from "../src/lib/llms-txt";
+import { NANO_PROMPT_TOKEN_BUDGET, selectHybridMode } from "../src/lib/hybrid-plan";
 import { planHybridRoute } from "../src/lib/route";
 import { parseRobots, robotsDecision, robotsRuleMatches } from "../src/lib/robots";
 import { parseTdmRepJson, parseTdmReservation, mergeTdm } from "../src/lib/tdm";
@@ -221,6 +222,31 @@ describe("cloud retry decision", () => {
     expect(brief).toMatch(/ai\.txt says Training: allow/);
     expect(brief).toMatch(/1 more on the Signals tab/);
     expect(brief).not.toMatch(/Applebot/);
+  });
+});
+
+describe("hybrid mode", () => {
+  it("uses every Firebase inference mode for a different situation", () => {
+    expect(selectHybridMode({ deviceReady: false, deviceBroken: false, promptTokens: 400, forceCloud: false }).mode).toBe(
+      "prefer_on_device",
+    );
+    expect(selectHybridMode({ deviceReady: true, deviceBroken: false, promptTokens: 400, forceCloud: false }).mode).toBe(
+      "only_on_device",
+    );
+    expect(selectHybridMode({ deviceReady: true, deviceBroken: false, promptTokens: 400, forceCloud: true }).mode).toBe(
+      "only_in_cloud",
+    );
+    expect(
+      selectHybridMode({
+        deviceReady: true,
+        deviceBroken: false,
+        promptTokens: NANO_PROMPT_TOKEN_BUDGET + 1,
+        forceCloud: false,
+      }).mode,
+    ).toBe("only_in_cloud");
+    expect(selectHybridMode({ deviceReady: false, deviceBroken: true, promptTokens: 400, forceCloud: false }).mode).toBe(
+      "prefer_in_cloud",
+    );
   });
 });
 
