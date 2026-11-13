@@ -1,0 +1,18 @@
+User-agent: *
+Disallow: /
+Content-Signal: search=no, ai-input=no, ai-train=no
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /

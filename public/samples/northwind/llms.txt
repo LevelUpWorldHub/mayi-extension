@@ -1,0 +1,8 @@
+# Northwind Archive
+
+> Field notebooks from tide stations and harbor sheds. This file is a map for readers, not a grant of rights.
+
+## Notebooks
+
+- [Herring fleet](https://northwind.example/notebooks/herring): Notes from Rockland to Grand Manan.
+- [Terms of Service](https://northwind.example/terms): The human-language rules.

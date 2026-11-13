@@ -1,0 +1,8 @@
+# Kindred Press
+
+> Short fiction and essays. Credit the author when you reuse a story.
+
+## Read
+
+- [This season](https://kindred.example/stories): The current issue.
+- [Terms](https://kindred.example/terms): What you may do with a story.

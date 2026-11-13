@@ -1,0 +1,12 @@
+Spec-Version: 1.0
+Site-Name: Pinnacle
+Training: deny
+Scraping: deny
+Indexing: allow
+
+Agent: *
+  Training: deny
+
+Agent: GPTBot
+  Training: deny
+  Scraping: deny

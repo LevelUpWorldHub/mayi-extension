@@ -1,0 +1,57 @@
+@import "tailwindcss";
+@import "@fontsource/fraunces/400.css";
+@import "@fontsource/fraunces/600.css";
+@import "@fontsource/fraunces/700.css";
+@import "@fontsource/source-sans-3/400.css";
+@import "@fontsource/source-sans-3/600.css";
+@import "@fontsource/source-sans-3/700.css";
+
+@theme {
+  --font-serif: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Source Sans 3", ui-sans-serif, "Segoe UI", sans-serif;
+  --color-paper: #f4efe4;
+  --color-paper-deep: #efe6d6;
+  --color-ink: #221c16;
+  --color-muted: #5c5146;
+  --color-line: #d9cbb6;
+  --color-seal: #b43322;
+  --color-yes: #1f6a45;
+  --color-conditional: #8a5a12;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: auto;
+  background: var(--color-paper-deep);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+.stamp {
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  place-items: center;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  font-family: var(--font-serif);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  transform: rotate(-8deg);
+}
+
+.ruled {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 27px,
+    color-mix(in srgb, var(--color-line) 80%, white) 28px
+  );
+}

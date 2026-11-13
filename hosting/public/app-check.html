@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MayI App Check bridge</title>
+  </head>
+  <body>
+    <p>MayI App Check bridge. This page is framed by the extension’s offscreen document.</p>
+    <script src="./config.js"></script>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
+      import {
+        initializeAppCheck,
+        ReCaptchaEnterpriseProvider,
+        getToken,
+      } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app-check.js";
+
+      const cfg = window.MAYI_APP_CHECK;
+      if (!cfg?.siteKey || !cfg.extensionId || !cfg.firebase?.apiKey) {
+        throw new Error("hosting/public/config.js is missing. Copy config.example.js and fill it in.");
+      }
+      const parentOrigin = `chrome-extension://${cfg.extensionId}`;
+      const app = initializeApp(cfg.firebase);
+      const appCheck = initializeAppCheck(app, {
+        provider: new ReCaptchaEnterpriseProvider(cfg.siteKey),
+        isTokenAutoRefreshEnabled: false,
+      });
+
+      window.parent.postMessage({ source: "mayi-app-check-ready" }, parentOrigin);
+
+      window.addEventListener("message", async (event) => {
+        if (event.origin !== parentOrigin) return;
+        if (event.data?.source !== "mayi-app-check-request") return;
+        try {
+          const result = await getToken(appCheck, false);
+          event.source?.postMessage(
+            {
+              source: "mayi-app-check",
+              token: result.token,
+              expireTimeMillis: Date.now() + 55 * 60 * 1000,
+            },
+            { targetOrigin: event.origin },
+          );
+        } catch (error) {
+          event.source?.postMessage(
+            { source: "mayi-app-check", error: error instanceof Error ? error.message : "App Check failed." },
+            { targetOrigin: event.origin },
+          );
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+Spec-Version: 1.0
+Site-Name: Kindred Press
+Training: conditional
+Scraping: allow
+Indexing: allow
+Training-License: CC-BY-4.0
+Training-Allow: /stories/*
+Training-Deny: /members/*
+
+Agent: GPTBot
+  Training: conditional
+  Scraping: allow

@@ -1,0 +1,8 @@
+# ai.txt — Northwind Archive
+Spec-Version: 1.0
+Site-Name: Northwind Archive
+Site-URL: https://northwind.example
+Training: allow
+Scraping: allow
+Indexing: allow
+Caching: allow

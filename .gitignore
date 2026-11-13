@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.local
+.env.*.local
+hosting/public/config.js
+.firebase
+*.log
+.DS_Store
+agent-tools

@@ -1,0 +1,6 @@
+Spec-Version: 1.0
+Site-Name: Lumen Health
+Training: deny
+Scraping: deny
+Indexing: deny
+Caching: deny

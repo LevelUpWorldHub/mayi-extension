@@ -1,0 +1,8 @@
+# Pinnacle
+
+> Product documentation for the workspace. This file is a map of our documentation. It is not permission to train models on Pinnacle content.
+
+## Docs
+
+- [Getting started](https://pinnacle.example/docs/start): Invite a team and open a folder.
+- [API](https://pinnacle.example/docs/api): Quotas and keys.
