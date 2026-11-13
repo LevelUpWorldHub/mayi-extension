@@ -49,6 +49,7 @@ export function highlightQuote(doc: Document, quote: string): boolean {
     mark.appendChild(target);
     first ??= mark;
   }
-  first?.scrollIntoView({ behavior: "smooth", block: "center" });
+  const reduce = doc.defaultView?.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  first?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
   return Boolean(first);
 }

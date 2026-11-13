@@ -211,6 +211,31 @@ Technical 9.5, Design 9, Impact 9, Idea 9.5. **Total 36.5.**
 
 **Total: 37 / 40.** Up 0.5. Design is at 9.5. Impact is the remaining short score.
 
+## Round 9 — accessibility and performance
+
+### Scores
+
+Technical 9.5, Design 9.5, Impact 9, Idea 9.5. **Total 37.**
+
+### Top 5 gaps
+
+1. Muted ink was 6.7:1, and the seal and conditional colors fell under 5:1 on their tinted banners. The smallest labels are 11px.
+2. The stamp animation and the clause scroll ignored `prefers-reduced-motion`.
+3. There was no skip link to the question.
+4. The site title was not the accessible name of the panel.
+5. Fonts are already local, which is the performance win that matters in an extension. Nothing else was a measured bottleneck.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9.5 | Unchanged. |
+| Design | 9.5 | Held. Muted is now 8.8:1 on the paper, seal 7.9:1 on the conflict banner, conditional 7.6:1, yes 7.4:1. A skip link targets the question. Reduced motion turns off the stamp and the smooth scroll. The panel is named by its title. The score stays 9.5 because the walk already earned that and this round removes barriers rather than adding a new visual idea. |
+| Impact | 9 | Unchanged. |
+| Idea / originality | 9.5 | Unchanged. |
+
+**Total: 37 / 40.** Flat, and not two flats in a row. No high-severity contrast gap left. Impact is still the short score.
+
 ## Round 4 — delight and demo moments
 
 ### Scores

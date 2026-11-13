@@ -12,11 +12,11 @@
   --color-paper: #f4efe4;
   --color-paper-deep: #efe6d6;
   --color-ink: #221c16;
-  --color-muted: #5c5146;
+  --color-muted: #4a4036;
   --color-line: #d9cbb6;
-  --color-seal: #b43322;
-  --color-yes: #1f6a45;
-  --color-conditional: #8a5a12;
+  --color-seal: #7f2418;
+  --color-yes: #14563a;
+  --color-conditional: #6a3f0a;
 }
 
 html,
@@ -109,6 +109,30 @@ body {
 .linkish:focus-visible {
   outline: 2px solid var(--color-seal);
   outline-offset: 2px;
+}
+
+.skip {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 5;
+  transform: translateY(-200%);
+  border-radius: 999px;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  padding: 0.4rem 0.8rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.skip:focus {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp {
+    animation: none;
+  }
 }
 
 .ruled {

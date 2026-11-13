@@ -131,7 +131,8 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   }, [snapshot]);
   const latestRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    latestRef.current?.scrollIntoView({ block: "nearest" });
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    latestRef.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
   }, [answers[0]?.id]);
   useEffect(() => {
     if (guide) setTab(guide.tab);
@@ -246,12 +247,17 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   }
 
   return (
-    <section className="flex min-h-[36rem] flex-col bg-paper text-ink lg:h-full lg:min-h-0">
+    <section aria-labelledby="mayi-site-title" className="relative flex min-h-[36rem] flex-col bg-paper text-ink lg:h-full lg:min-h-0">
+      <a className="skip" href="#mayi-question">
+        Skip to the question
+      </a>
       <header className="border-b border-line px-4 py-3">
         <p className="font-serif text-xs uppercase tracking-[0.22em] text-seal">MayI · FinePrint</p>
         <div className="mt-1 flex items-start justify-between gap-3">
           <div>
-            <h1 className="font-serif text-2xl leading-none">{snapshot?.title ?? "No site yet"}</h1>
+            <h1 id="mayi-site-title" className="font-serif text-2xl leading-none">
+              {snapshot?.title ?? "No site yet"}
+            </h1>
             <p className="mt-1 text-sm text-muted">{snapshot?.host ?? "Open a page to read its terms."}</p>
           </div>
           {onReread ? (
@@ -377,6 +383,7 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
               <input
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
+                id="mayi-question"
                 ref={askRef}
                 aria-label="May I question"
                 aria-keyshortcuts="/"
