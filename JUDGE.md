@@ -33,3 +33,28 @@ Strict #BuildHybridAI scoring. Each criterion is 1–10 and weighted equally. No
 | Idea / originality | 9 | The disagreement is now visible as two columns, and Sable exists specifically so the hybrid fallback has a reason: the sentence Nano would not see. |
 
 **Total: 33 / 40.** Up from 29. Not every criterion is 9.
+
+## Round 2
+
+### Scores
+
+Carried forward from the round 1 re-score: Technical 8, Design 8, Impact 8, Idea 9. **Total 33.**
+
+### Top 5 gaps
+
+1. On Sable the helper still says "open Sable Ferry", and nothing invites the one click that reveals the Cloud route. The long-document note only says MayI ranks clauses.
+2. A conflict has no "for you" line. The reader sees a disagreement and is not told to hold off on training or scraping.
+3. A new answer is not announced and is not scrolled into view, so on a laptop the proof sits under the fold.
+4. The five samples look the same. The panel does not say which beat this site is for.
+5. The architecture diagram still describes the cloud hop as "model missing or doc too long" rather than "the on-device excerpt missed the clause."
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 8 | No change to the engine. The cloud route is now a button on top of the round 1 planner. |
+| Design | 8 | Samples are labeled (Files vs terms, Past Nano, and the rest). Sable leads with Show the cloud route. A new answer scrolls into view and is in a live region. The Files cell is still every signal jammed into one line. |
+| Impact | 9 | The banner now says what to do: do not train, the files are not permission. |
+| Idea / originality | 9 | Unchanged. The two-column disagreement plus the late clause is the idea, and it is on screen. |
+
+**Total: 34 / 40.** Up 1. Technical and design are still short of 9. The Files cell is the high-severity design gap.

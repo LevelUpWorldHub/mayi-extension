@@ -53,7 +53,7 @@ flowchart LR
   Panel --> Parse
   Parse --> Store
   Panel -->|PREFER_ON_DEVICE| Nano
-  Nano -->|model missing or doc too long| Cloud
+  Nano -->|on-device excerpt missed the clause| Cloud
   Panel --> Off
   Off --> Bridge
   Bridge --> Check
@@ -151,7 +151,7 @@ Sample pages are also packed inside the extension at `dist/samples/` so the offl
 
 ## Samples
 
-Four fictional sites live in `public/samples/`. The prose is original. It is not copied from anyone’s terms.
+Five fictional sites live in `public/samples/`. The prose is original. It is not copied from anyone’s terms.
 
 | Site | What to look at |
 | --- | --- |
@@ -168,7 +168,7 @@ npm test
 npm run typecheck
 ```
 
-`tests/mayi.test.ts` covers the robots parser (including Content-Signal), the ai.txt directive parser, llms.txt opt-out language, TDM reservation merging, clause citation (exact, whitespace-normalized, and fuzzy), chunk selection around a late keyword, the policy diff, and all four sample sites: verdicts, the Northwind conflict, the Kindred well-known path, the Lumen privacy diff, and Pinnacle’s length.
+`tests/mayi.test.ts` covers the robots parser (including Content-Signal), the ai.txt directive parser, llms.txt opt-out language, TDM reservation merging, clause citation (exact, whitespace-normalized, and fuzzy), chunk selection around a late keyword, the policy diff, and the sample sites: the Northwind conflict, the Kindred well-known path, the Lumen privacy diff, Pinnacle’s tension, and Sable Ferry’s cloud route (the on-device excerpt misses the training ban, the cloud excerpt contains it).
 
 GitHub Actions (`.github/workflows/ci.yml`) runs `npm ci`, the tests, the typecheck, and `npm run build` on Node 22. The build does not need a `.env` file.
 

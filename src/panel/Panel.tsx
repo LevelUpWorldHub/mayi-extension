@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
 import { askPresets, askQuestion } from "../lib/ask";
+import { answerExtractive } from "../lib/extractive";
+import { planHybridRoute } from "../lib/route";
 import type { CardModel } from "../lib/card";
 import { permissionMarkdown, renderCardPng } from "../lib/card";
 import type { SiteSnapshot } from "../lib/collect";
@@ -59,6 +61,22 @@ function badge(path: InferencePath): string {
   return "Unreported";
 }
 
+function forYou(item: ConflictItem): string | null {
+  if (item.severity === "conflict" && item.topic === "training") {
+    return "For you: do not train on this. The files are not the permission the contract withholds.";
+  }
+  if (item.severity === "conflict" && item.topic === "scraping") {
+    return "For you: do not scrape this. A crawler allow-list does not beat the terms.";
+  }
+  if (item.severity === "tension") {
+    return "For you: the permission is narrow. Read the clause before you rely on the files.";
+  }
+  if (item.severity === "aligned") {
+    return "For you: the files and the contract tell the same story. Keep the clause anyway.";
+  }
+  return null;
+}
+
 function severityClass(severity: ConflictItem["severity"]): string {
   if (severity === "conflict") return "border-seal/40 bg-[#f8e4dc] text-seal";
   if (severity === "tension") return "border-conditional/40 bg-[#f6ead2] text-conditional";
@@ -92,6 +110,16 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   const firebase = firebaseConfigPresent();
   const [status] = useState(() => (firebase ? initFirebase() : getFirebaseStatus()));
   const policyChars = snapshot?.policies.reduce((sum, policy) => sum + policy.text.length, 0) ?? 0;
+  const cloudTrain = useMemo(() => {
+    if (!snapshot?.policies.length) return null;
+    const train = answerExtractive("May I train AI on it?", snapshot.policies, "train");
+    if (!train.quote) return null;
+    return planHybridRoute(snapshot.policies, train.question, train.quote).step === "cloud_retry" ? train : null;
+  }, [snapshot]);
+  const latestRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    latestRef.current?.scrollIntoView({ block: "nearest" });
+  }, [answers[0]?.id]);
 
   async function ask(text: string, presetId?: string) {
     if (!snapshot || !text.trim()) return;
@@ -209,6 +237,7 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
             {report.primary.severity === "conflict" ? "Files and contract disagree" : report.primary.severity}
           </p>
           <p className="mt-1 font-serif text-lg leading-snug">{report.primary.headline}</p>
+          {forYou(report.primary) ? <p className="mt-1 text-sm font-semibold">{forYou(report.primary)}</p> : null}
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <div className="rounded-xl bg-white/50 px-3 py-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide">Files</p>
@@ -307,10 +336,13 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
                 Ask
               </Button>
             </form>
-            {!answers.length && !asking ? (
-              <p className="text-sm text-muted">
-                Start with the banner. Then ask. For a contract longer than Nano can read at once, open Sable Ferry and ask about training: the clause is past the on-device excerpt, and the card says Cloud route.
-              </p>
+            {cloudTrain && !answers.some((answer) => answer.presetId === "train") ? (
+              <div className="rounded-2xl border border-conditional/40 bg-[#f6ead2] px-3 py-3 text-sm text-conditional">
+                <p>The training ban sits past the excerpt Gemini Nano can read. The full page is still on this device.</p>
+                <Button className="mt-2" variant="outline" size="sm" disabled={Boolean(asking)} onClick={() => void ask(cloudTrain.question, "train")}>
+                  Show the cloud route
+                </Button>
+              </div>
             ) : null}
             <div className="flex flex-wrap gap-1.5">
               {PRESETS.map((preset) => (
@@ -335,7 +367,7 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
                 {askError}
               </p>
             ) : null}
-            {policyChars > LONG_DOCUMENT_CHARS ? (
+            {policyChars > LONG_DOCUMENT_CHARS && !cloudTrain ? (
               <p className="text-xs text-muted">
                 This contract is longer than Gemini Nano’s excerpt. MayI ranks the matching clauses
                 {firebase ? " and can send a larger excerpt to the cloud, labeled Cloud." : "."}
@@ -344,8 +376,9 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
             {!snapshot.policies.length ? (
               <p className="text-sm text-muted">MayI couldn’t find a terms, privacy, or license page on this site.</p>
             ) : null}
-            {answers.map((answer) => (
-              <article key={answer.id} className="rounded-2xl border border-line bg-white/40 p-3">
+            <div aria-live="polite" className="space-y-3">
+            {answers.map((answer, index) => (
+              <article key={answer.id} ref={index === 0 ? latestRef : undefined} className="rounded-2xl border border-line bg-white/40 p-3">
                 <div className="flex gap-3">
                   <div className={`stamp ${stampTone(answer.verdict, answer.tone)}`} role="img" aria-label={verdictLabel(answer.verdict)}>
                     {verdictWord(answer.verdict)}
@@ -390,6 +423,7 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
                 </div>
               </article>
             ))}
+            </div>
           </div>
         ) : null}
 

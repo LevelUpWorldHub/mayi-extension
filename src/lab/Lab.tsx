@@ -77,9 +77,10 @@ export function Lab() {
               key={item.id}
               type="button"
               aria-pressed={item.id === sample.id}
-              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${item.id === sample.id ? "bg-ink text-paper" : "border border-line bg-white/50"}`}
+              className={`rounded-full px-3 py-1.5 text-left text-sm font-semibold ${item.id === sample.id ? "bg-ink text-paper" : "border border-line bg-white/50"}`}
               onClick={() => setSample(item)}
             >
+              <span className="block text-[10px] font-semibold uppercase tracking-wide opacity-70">{item.mark}</span>
               {item.name}
             </button>
           ))}
