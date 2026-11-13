@@ -11,6 +11,11 @@ function noteRoute(answer: Answer, docs: PolicyDoc[]): Answer {
   return { ...answer, routeNote: plan.note };
 }
 
+export function isBlankQuestion(question: string): boolean {
+  const trimmed = question.trim().toLowerCase().replace(/[?.!]+$/g, "").trim();
+  return trimmed.length === 0 || trimmed === "may i";
+}
+
 export async function askQuestion(options: {
   question: string;
   docs: PolicyDoc[];
@@ -18,6 +23,22 @@ export async function askQuestion(options: {
   onDeviceProgress?: (value: number) => void;
 }): Promise<Answer> {
   const question = options.question.trim();
+  if (isBlankQuestion(question)) {
+    return {
+      id: crypto.randomUUID(),
+      question: question || "May I",
+      presetId: options.presetId ?? null,
+      tone: "permission",
+      verdict: "unknown",
+      reason: "Finish the question. For example: May I train AI on it?",
+      quote: null,
+      sourceUrl: null,
+      sourceTitle: null,
+      citation: null,
+      inference: "extractive",
+      inferenceDetail: "Local reading — there was no question to match.",
+    };
+  }
   const preset = presetById(options.presetId) ?? presetForQuestion(question);
   const presetId = preset?.id ?? options.presetId ?? null;
   if (!firebaseConfigPresent()) {

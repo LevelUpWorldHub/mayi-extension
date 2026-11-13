@@ -121,18 +121,37 @@ export function headerMap(headers: Headers): Record<string, string> {
   return out;
 }
 
+const FETCH_CAP = 1_500_000;
+
+export function readableFetchUrl(url: string): string {
+  const parsed = new URL(url);
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("MayI only fetches http and https pages.");
+  }
+  return parsed.href;
+}
+
+export function fetchFailureMessage(error: unknown): string {
+  const name = error instanceof Error ? error.name : "";
+  if (name === "TimeoutError" || name === "AbortError") return "Timed out after 12 seconds.";
+  if (error instanceof Error && error.message) return error.message;
+  return "Network error";
+}
+
 export async function httpFetcher(url: string): Promise<FetchResult> {
   try {
-    const response = await fetch(url, {
+    const target = readableFetchUrl(url);
+    const response = await fetch(target, {
       credentials: "omit",
       redirect: "follow",
       signal: AbortSignal.timeout(12_000),
     });
+    const raw = await response.text();
     return {
       ok: response.ok,
       status: response.status,
-      url: response.url || url,
-      text: await response.text(),
+      url: response.url || target,
+      text: raw.length > FETCH_CAP ? raw.slice(0, FETCH_CAP) : raw,
       headers: headerMap(response.headers),
     };
   } catch (error) {
@@ -142,7 +161,7 @@ export async function httpFetcher(url: string): Promise<FetchResult> {
       url,
       text: "",
       headers: {},
-      error: error instanceof Error ? error.message : "Network error",
+      error: fetchFailureMessage(error),
     };
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
-import { askPresets, askQuestion } from "../lib/ask";
+import { askPresets, askQuestion, isBlankQuestion } from "../lib/ask";
 import { answerExtractive } from "../lib/extractive";
 import { planHybridRoute } from "../lib/route";
 import type { CardModel } from "../lib/card";
@@ -146,7 +146,10 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   }, []);
 
   async function ask(text: string, presetId?: string) {
-    if (!snapshot || !text.trim()) return;
+    if (!snapshot || isBlankQuestion(text)) {
+      if (snapshot) setAskError("Finish the question. For example: May I train AI on it?");
+      return;
+    }
     setAsking(text);
     setAskError(null);
     setProgress(null);
