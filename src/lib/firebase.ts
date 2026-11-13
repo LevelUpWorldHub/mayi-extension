@@ -14,17 +14,17 @@ import {
   type GenerativeModel,
 } from "firebase/ai";
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
+import { CLOUD_CHAR_BUDGET, LONG_DOCUMENT_CHARS, ON_DEVICE_CHAR_BUDGET } from "./budgets";
 import { locateQuote } from "./citation";
 import { selectChunks, type RankedExcerpt } from "./chunk";
+import { shouldRetryInCloud } from "./route";
 import { classifySentence } from "./extractive";
 import { buildAskPrompt } from "./prompts";
 import { presetById } from "./presets";
 import type { Answer, InferencePath, PolicyDoc, Verdict } from "./types";
 
 const CLOUD_MODEL = "gemini-3.5-flash-lite";
-export const ON_DEVICE_CHAR_BUDGET = 6_000;
-export const CLOUD_CHAR_BUDGET = 18_000;
-export const LONG_DOCUMENT_CHARS = 12_000;
+export { CLOUD_CHAR_BUDGET, LONG_DOCUMENT_CHARS, ON_DEVICE_CHAR_BUDGET };
 
 export type AppCheckMode = "recaptcha-enterprise" | "debug" | "extension-bridge" | "not-configured";
 
@@ -238,11 +238,8 @@ export async function askFirebase(options: {
   if (!status.configured) throw new Error("Firebase is not configured.");
   const total = options.docs.reduce((sum, doc) => sum + doc.text.length, 0);
   const long = total > LONG_DOCUMENT_CHARS;
-  const first = await generate(
-    InferenceMode.PREFER_ON_DEVICE,
-    options.question,
-    selectChunks(options.docs, options.question, ON_DEVICE_CHAR_BUDGET),
-  );
+  const onDeviceExcerpts = selectChunks(options.docs, options.question, ON_DEVICE_CHAR_BUDGET);
+  const first = await generate(InferenceMode.PREFER_ON_DEVICE, options.question, onDeviceExcerpts);
   let parsed = first.parsed;
   let inference = first.inference;
   let detail =
@@ -257,7 +254,13 @@ export async function askFirebase(options: {
         : "Firebase answered, and did not say whether Nano or the cloud ran it.";
 
   let cited = cite(parsed, options.docs);
-  if (long && (!cited.quote || parsed.verdict === "unknown")) {
+  const retry = shouldRetryInCloud({
+    totalChars: total,
+    onDeviceExcerpt: onDeviceExcerpts.map((excerpt) => excerpt.text).join("\n"),
+    quote: cited.quote,
+    verdict: parsed.verdict,
+  });
+  if (retry) {
     const second = await generate(
       InferenceMode.ONLY_IN_CLOUD,
       options.question,

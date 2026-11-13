@@ -92,7 +92,7 @@ result.response.inferenceSource; // "on_device" or "in_cloud"
 ```
 
 - Chrome 139+ desktop can run Gemini Nano. `PREFER_ON_DEVICE` uses it when the model is downloaded and falls back to the cloud when it is not.
-- On-device context is about 9,216 tokens. MayI sends at most ~6,000 characters of ranked excerpts. Past ~12,000 characters of policy text, a missing quote triggers one cloud retry with a larger excerpt (~18,000 characters). The badge on that answer says **Cloud**.
+- On-device context is about 9,216 tokens. MayI sends at most ~6,000 characters of ranked excerpts, and the cloud retry may send about 18,000. Past 12,000 characters, a clause that is missing from the on-device excerpt triggers one cloud retry. The badge on that answer says **Cloud**. Sable Ferry is the sample that shows this: without Firebase keys the card says **Cloud route** and still quotes the real sentence from the full page.
 - The displayed quote must be a real span from the page (`locateQuote`). A preset classifier can correct the verdict when it disagrees with the model about that span.
 - With no Firebase config, MayI still answers. That path is a local clause matcher. The badge says **Local reading**. It is not Gemini.
 
@@ -159,6 +159,7 @@ Four fictional sites live in `public/samples/`. The prose is original. It is not
 | Lumen Health | Files and contract agree: no training, no scraping. The privacy policy now sells location data. **Changes** shows that against the stored previous copy. Arbitration and auto-renewal are in the terms. |
 | Kindred Press | `ai.txt` is only at `/.well-known/ai.txt`. Training is conditional on both sides: you may train if you give credit. |
 | Pinnacle | A long contract. Scraping is allowed only through the documented API while `ai.txt` denies scraping, so the signals tab shows tension. Cancellation is by certified mail. |
+| Sable Ferry | Longer than Gemini Nano’s excerpt. The files allow training. The ban is a single sentence past the on-device window, so the answer card says **Cloud route**. With Firebase configured, that retry is badged Cloud. |
 
 ## Tests
 

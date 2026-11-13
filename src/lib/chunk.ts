@@ -110,6 +110,7 @@ export function selectChunks(
   const picked: RankedExcerpt[] = [];
   let used = 0;
   const pool = ranked.some((chunk) => chunk.score > 0) ? ranked : all;
+  const pieceCap = Math.max(4, Math.ceil(budget / 1500));
   for (const chunk of pool) {
     const room = budget - used;
     if (room < 80) break;
@@ -117,7 +118,7 @@ export function selectChunks(
     if (!text) continue;
     picked.push({ ...chunk, text });
     used += text.length;
-    if (used >= budget || picked.length >= 4) break;
+    if (used >= budget || picked.length >= pieceCap) break;
   }
   return picked.sort((left, right) => left.title.localeCompare(right.title) || left.start - right.start);
 }

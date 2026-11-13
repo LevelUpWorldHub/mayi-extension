@@ -1,0 +1,4 @@
+Spec-Version: 1.0
+Site-Name: Sable Ferry
+Training: allow
+Scraping: allow

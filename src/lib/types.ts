@@ -56,4 +56,6 @@ export interface Answer {
   citation: Citation | null;
   inference: InferencePath;
   inferenceDetail: string;
+  /** Set when a long policy's on-device excerpt misses the cited clause. */
+  routeNote?: string | null;
 }

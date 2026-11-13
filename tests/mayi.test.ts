@@ -9,6 +9,7 @@ import { diffPolicies } from "../src/lib/diff";
 import { answerExtractive } from "../src/lib/extractive";
 import { htmlToText } from "../src/lib/html";
 import { parseLlmsTxt } from "../src/lib/llms-txt";
+import { planHybridRoute } from "../src/lib/route";
 import { parseRobots, robotsDecision, robotsRuleMatches } from "../src/lib/robots";
 import { parseTdmRepJson, parseTdmReservation, mergeTdm } from "../src/lib/tdm";
 import type { Fetcher } from "../src/lib/types";
@@ -176,7 +177,9 @@ function sampleFetcher(): Fetcher {
           headers["tdm-reservation"] = "1";
           headers["tdm-policy"] = "https://lumen.example/privacy";
         }
-        if (pathname.startsWith("samples/northwind/")) headers["tdm-reservation"] = "0";
+        if (pathname.startsWith("samples/northwind/") || pathname.startsWith("samples/sable/")) {
+          headers["tdm-reservation"] = "0";
+        }
         if (pathname.startsWith("samples/pinnacle/")) headers["x-robots-tag"] = "noai, noimageai";
         return { ok: true, status: 200, url, text, headers };
       } catch {
@@ -244,5 +247,22 @@ describe("sample sites", () => {
     expect(detectConflicts(site.signals, site.policies).items.find((item) => item.topic === "training")?.severity).toBe("aligned");
     expect(detectConflicts(site.signals, site.policies).items.find((item) => item.topic === "scraping")?.severity).toBe("tension");
     expect(site.signals.llms?.mentionsOptOut).toBe(true);
+  });
+
+  it("sends Sable's late training ban down the cloud route", async () => {
+    const site = await loadSample("sable");
+    const total = site.policies.reduce((sum, doc) => sum + doc.text.length, 0);
+    expect(total).toBeGreaterThan(12_000);
+    const train = answerExtractive("May I train AI on it?", site.policies, "train");
+    expect(train.verdict).toBe("no");
+    expect(train.quote).toMatch(/may not use Sable Ferry/i);
+    const route = planHybridRoute(site.policies, train.question, train.quote);
+    expect(route.long).toBe(true);
+    expect(route.onDeviceHasClause).toBe(false);
+    expect(route.cloudHasClause).toBe(true);
+    expect(route.step).toBe("cloud_retry");
+    expect(detectConflicts(site.signals, site.policies).items.find((item) => item.topic === "training")?.severity).toBe(
+      "conflict",
+    );
   });
 });

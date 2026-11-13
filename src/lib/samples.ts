@@ -35,6 +35,13 @@ export const SAMPLES: SampleSite[] = [
     blurb: "A long contract. Cancellation is by certified mail.",
     rootPath: "/samples/pinnacle",
   },
+  {
+    id: "sable",
+    name: "Sable Ferry",
+    host: "sable.example",
+    blurb: "A long contract. The training ban sits past Nano's excerpt.",
+    rootPath: "/samples/sable",
+  },
 ];
 
 export function sampleById(id: string): SampleSite | undefined {

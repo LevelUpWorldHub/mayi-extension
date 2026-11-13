@@ -82,6 +82,7 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   const [progress, setProgress] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
+  const [askError, setAskError] = useState<string | null>(null);
   const [replaying, setReplaying] = useState(false);
 
   const report = useMemo(
@@ -95,6 +96,7 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   async function ask(text: string, presetId?: string) {
     if (!snapshot || !text.trim()) return;
     setAsking(text);
+    setAskError(null);
     setProgress(null);
     setTab("ask");
     try {
@@ -105,6 +107,8 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
         onDeviceProgress: (value) => setProgress(`Preparing Gemini Nano… ${Math.round(value * 100)}%`),
       });
       setAnswers((current) => [answer, ...current.filter((item) => item.question !== answer.question)]);
+    } catch (cause) {
+      setAskError(cause instanceof Error ? cause.message : "MayI couldn't answer that.");
     } finally {
       setAsking(null);
       setProgress(null);
@@ -114,12 +118,15 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   async function askUsual() {
     if (!snapshot) return;
     setAsking("usual");
+    setAskError(null);
     setTab("ask");
     try {
       const next = await askPresets(snapshot.policies, (done, total) => {
         setProgress(`Reading ${done} of ${total}`);
       }, (value) => setProgress(`Preparing Gemini Nano… ${Math.round(value * 100)}%`));
       setAnswers(next);
+    } catch (cause) {
+      setAskError(cause instanceof Error ? cause.message : "MayI couldn't answer the usual eight.");
     } finally {
       setAsking(null);
       setProgress(null);
@@ -197,23 +204,54 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
       </header>
 
       {report?.primary ? (
-        <div className={`mx-4 mt-3 rounded-2xl border px-3 py-3 ${severityClass(report.primary.severity)}`}>
+        <div className={`mx-4 mt-3 rounded-2xl border px-3 py-3 ${severityClass(report.primary.severity)}`} role="status">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">
             {report.primary.severity === "conflict" ? "Files and contract disagree" : report.primary.severity}
           </p>
           <p className="mt-1 font-serif text-lg leading-snug">{report.primary.headline}</p>
+          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+            <div className="rounded-xl bg-white/50 px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide">Files</p>
+              <p className="mt-1">{report.primary.machineSummary}</p>
+            </div>
+            <div className="rounded-xl bg-white/50 px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide">Contract</p>
+              <p className="mt-1">{report.primary.policyQuote ?? report.primary.policySummary}</p>
+              {report.primary.policyQuote && report.primary.policyUrl ? (
+                <button
+                  type="button"
+                  className="mt-2 font-semibold underline-offset-2 hover:underline"
+                  onClick={() => onShowClause(report.primary?.policyUrl as string, report.primary?.policyQuote as string)}
+                >
+                  Show this clause
+                </button>
+              ) : null}
+            </div>
+          </div>
         </div>
       ) : null}
 
-      <div className="mt-3 flex gap-1 px-4" role="tablist">
+      <div className="mt-3 flex gap-1 px-4" role="tablist" aria-label="MayI sections">
         {TABS.map((item) => (
           <button
             key={item.id}
             type="button"
             role="tab"
+            id={`mayi-tab-${item.id}`}
             aria-selected={tab === item.id}
-            className={`rounded-full px-3 py-1.5 text-sm font-semibold ${tab === item.id ? "bg-ink text-paper" : "text-muted hover:bg-paper-deep"}`}
+            aria-controls={`mayi-panel-${item.id}`}
+            tabIndex={tab === item.id ? 0 : -1}
+            className={`rounded-full px-3 py-1.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-seal ${tab === item.id ? "bg-ink text-paper" : "text-muted hover:bg-paper-deep"}`}
             onClick={() => setTab(item.id)}
+            onKeyDown={(event) => {
+              const index = TABS.findIndex((entry) => entry.id === item.id);
+              if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+                event.preventDefault();
+                const next = TABS[(index + (event.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length];
+                setTab(next.id);
+                document.getElementById(`mayi-tab-${next.id}`)?.focus();
+              }
+            }}
           >
             {item.label}
             {item.id === "changes" && changes.length ? ` ${changes.length}` : ""}
@@ -221,7 +259,13 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
+        role="tabpanel"
+        id={`mayi-panel-${tab}`}
+        aria-labelledby={`mayi-tab-${tab}`}
+        aria-busy={Boolean(asking) || loading}
+      >
         {loading ? <p className="text-sm text-muted">Fetching robots.txt, ai.txt, and the policy pages…</p> : null}
         {error ? (
           <p className="mb-3 rounded-xl border border-seal/30 bg-[#f8e4dc] px-3 py-2 text-sm text-seal" role="alert">
@@ -232,6 +276,14 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
           <div className="ruled rounded-2xl border border-line px-4 py-6">
             <p className="font-serif text-xl leading-snug">
               Point MayI at a site. It reads the terms, then answers in one sentence and shows the sentence it used.
+            </p>
+            <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-muted">
+              <li>Open any page on the site, then press This tab.</li>
+              <li>Read the banner first. It is the files on one side and the contract on the other.</li>
+              <li>Ask a question. Show this clause highlights the sentence on the policy page.</li>
+            </ol>
+            <p className="mt-3 text-sm">
+              For builders about to train or scrape, and for anyone about to accept a renewal or an arbitration clause.
             </p>
           </div>
         ) : null}
@@ -255,22 +307,34 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
                 Ask
               </Button>
             </form>
+            {!answers.length && !asking ? (
+              <p className="text-sm text-muted">
+                Start with the banner. Then ask. For a contract longer than Nano can read at once, open Sable Ferry and ask about training: the clause is past the on-device excerpt, and the card says Cloud route.
+              </p>
+            ) : null}
             <div className="flex flex-wrap gap-1.5">
               {PRESETS.map((preset) => (
                 <button
                   key={preset.id}
                   type="button"
-                  className="rounded-full border border-line bg-white/50 px-2.5 py-1 text-xs font-semibold hover:border-ink"
+                  aria-busy={asking === preset.question}
+                  className="rounded-full border border-line bg-white/50 px-2.5 py-1 text-xs font-semibold hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-seal disabled:opacity-50"
+                  disabled={Boolean(asking)}
                   onClick={() => void ask(preset.question, preset.id)}
                 >
-                  {preset.question.replace(/^May I /, "").replace(/\?$/, "")}
+                  {asking === preset.question ? "Reading…" : preset.question.replace(/^May I /, "").replace(/\?$/, "")}
                 </button>
               ))}
             </div>
             <Button variant="outline" onClick={() => void askUsual()} disabled={Boolean(asking)}>
-              Answer the usual eight
+              {asking === "usual" ? "Reading the eight…" : "Answer the usual eight"}
             </Button>
-            {progress ? <p className="text-sm text-muted">{progress}</p> : null}
+            {progress ? <p className="text-sm text-muted" role="status">{progress}</p> : null}
+            {askError ? (
+              <p className="rounded-xl border border-seal/30 bg-[#f8e4dc] px-3 py-2 text-sm text-seal" role="alert">
+                {askError}
+              </p>
+            ) : null}
             {policyChars > LONG_DOCUMENT_CHARS ? (
               <p className="text-xs text-muted">
                 This contract is longer than Gemini Nano’s excerpt. MayI ranks the matching clauses
@@ -283,7 +347,7 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
             {answers.map((answer) => (
               <article key={answer.id} className="rounded-2xl border border-line bg-white/40 p-3">
                 <div className="flex gap-3">
-                  <div className={`stamp ${stampTone(answer.verdict, answer.tone)}`} aria-hidden>
+                  <div className={`stamp ${stampTone(answer.verdict, answer.tone)}`} role="img" aria-label={verdictLabel(answer.verdict)}>
                     {verdictWord(answer.verdict)}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -315,6 +379,11 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
                       >
                         Show this clause
                       </button>
+                    ) : null}
+                    {answer.routeNote ? (
+                      <p className="mt-2 rounded-xl border border-conditional/40 bg-[#f6ead2] px-3 py-2 text-xs text-conditional">
+                        {answer.routeNote}
+                      </p>
                     ) : null}
                     <p className="mt-2 text-[11px] text-muted">{answer.inferenceDetail}</p>
                   </div>

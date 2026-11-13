@@ -1,7 +1,15 @@
 import { answerExtractive } from "./extractive";
 import { askFirebase, firebaseConfigPresent, initFirebase, prepareOnDeviceModel } from "./firebase";
+import { planHybridRoute } from "./route";
 import { presetById, presetForQuestion, PRESETS } from "./presets";
 import type { Answer, PolicyDoc } from "./types";
+
+function noteRoute(answer: Answer, docs: PolicyDoc[]): Answer {
+  if (!answer.quote || answer.inference === "on_device" || answer.inference === "cloud") return answer;
+  const plan = planHybridRoute(docs, answer.question, answer.quote);
+  if (plan.step !== "cloud_retry") return answer;
+  return { ...answer, routeNote: plan.note };
+}
 
 export async function askQuestion(options: {
   question: string;
@@ -14,7 +22,7 @@ export async function askQuestion(options: {
   const presetId = preset?.id ?? options.presetId ?? null;
   if (!firebaseConfigPresent()) {
     const local = answerExtractive(question, options.docs, presetId);
-    return { ...local, question };
+    return noteRoute({ ...local, question }, options.docs);
   }
   initFirebase();
   try {
@@ -32,11 +40,14 @@ export async function askQuestion(options: {
   } catch (error) {
     const local = answerExtractive(question, options.docs, presetId);
     const message = error instanceof Error ? error.message : "Firebase request failed.";
-    return {
-      ...local,
-      question,
-      inferenceDetail: `Local reading — Firebase didn't answer (${message}).`,
-    };
+    return noteRoute(
+      {
+        ...local,
+        question,
+        inferenceDetail: `Local reading — Firebase didn't answer (${message}).`,
+      },
+      options.docs,
+    );
   }
 }
 
