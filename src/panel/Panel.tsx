@@ -24,6 +24,7 @@ export interface PanelProps {
   onShowClause: (url: string, quote: string) => void;
   onReread?: () => void;
   onChanges: (changes: WatchedChange[]) => void;
+  guide?: { tab: Tab; note: string } | null;
 }
 
 const TABS: { id: Tab; label: string }[] = [
@@ -91,7 +92,7 @@ function severityClass(severity: ConflictItem["severity"]): string {
   return "border-line bg-paper text-muted";
 }
 
-export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause, onReread, onChanges }: PanelProps) {
+export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause, onReread, onChanges, guide }: PanelProps) {
   const [tab, setTab] = useState<Tab>("ask");
   const [question, setQuestion] = useState("May I ");
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -132,6 +133,9 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   useEffect(() => {
     latestRef.current?.scrollIntoView({ block: "nearest" });
   }, [answers[0]?.id]);
+  useEffect(() => {
+    if (guide) setTab(guide.tab);
+  }, [guide?.tab, guide?.note]);
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;

@@ -186,6 +186,31 @@ Technical 9.5, Design 9, Impact 9, Idea 9.5. **Total 36.5.**
 
 **Total: 36.5 / 40.** Flat. The robustness work closed holes without moving a score that was already at the honest ceiling for this layer. One flat round is allowed. The next round has to move a score.
 
+## Round 8 — demo wow
+
+### Scores
+
+Technical 9.5, Design 9, Impact 9, Idea 9.5. **Total 36.5.**
+
+### Top 5 gaps
+
+1. A judge still has to know to open Northwind, then Lumen’s Changes tab, then Sable. Nothing walks that path.
+2. The three beats in the panel are checkmarks, not a script.
+3. The cloud-route button is easy to miss if you land on Northwind and stay there.
+4. The lab header repeats the sample blurb and never says what to click.
+5. Switching samples by hand drops you on Ask even when the point of the site is the diff.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9.5 | Unchanged. |
+| Design | 9.5 | “Walk the three beats” moves Northwind → Lumen’s Changes tab → Sable, and the header says what to read or press. Picking a sample yourself leaves the walk. The stepper still checks off banner, answer, and clause. |
+| Impact | 9 | Unchanged. |
+| Idea / originality | 9.5 | Unchanged. The walk is how a judge sees the idea in under a minute. It does not add a new idea. |
+
+**Total: 37 / 40.** Up 0.5. Design is at 9.5. Impact is the remaining short score.
+
 ## Round 4 — delight and demo moments
 
 ### Scores
