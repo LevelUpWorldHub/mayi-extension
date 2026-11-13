@@ -32,15 +32,19 @@ export function decodeEntities(value: string): string {
 
 export function htmlToText(html: string): string {
   const withoutDanger = html
+    .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<svg[\s\S]*?<\/svg>/gi, " ");
+    .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
+    .replace(/<script\b[^>]*>[\s\S]*$/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*$/gi, " ");
   const withBreaks = withoutDanger
-    .replace(/<\/(p|div|h1|h2|h3|h4|li|tr|section|article|blockquote|br)>/gi, "\n")
+    .replace(/<(p|div|h1|h2|h3|h4|li|tr|section|article|blockquote|br)\b[^>]*>/gi, "\n")
+    .replace(/<\/(p|div|h1|h2|h3|h4|li|tr|section|article|blockquote)>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, " ");
-  const decoded = decodeEntities(withBreaks)
+  const decoded = decodeEntities(decodeEntities(withBreaks))
     .replace(/\u00a0/g, " ")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n[ \t]+/g, "\n")
@@ -117,14 +121,41 @@ export function headerMap(headers: Headers): Record<string, string> {
   return out;
 }
 
+const FETCH_CAP = 1_500_000;
+
+export function readableFetchUrl(url: string): string {
+  const parsed = new URL(url);
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("MayI only fetches http and https pages.");
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error("MayI will not send a fetch that contains a username or password.");
+  }
+  parsed.hash = "";
+  return parsed.href;
+}
+
+export function fetchFailureMessage(error: unknown): string {
+  const name = error instanceof Error ? error.name : "";
+  if (name === "TimeoutError" || name === "AbortError") return "Timed out after 12 seconds.";
+  if (error instanceof Error && error.message) return error.message;
+  return "Network error";
+}
+
 export async function httpFetcher(url: string): Promise<FetchResult> {
   try {
-    const response = await fetch(url, { credentials: "omit", redirect: "follow" });
+    const target = readableFetchUrl(url);
+    const response = await fetch(target, {
+      credentials: "omit",
+      redirect: "follow",
+      signal: AbortSignal.timeout(12_000),
+    });
+    const raw = await response.text();
     return {
       ok: response.ok,
       status: response.status,
-      url: response.url || url,
-      text: await response.text(),
+      url: response.url || target,
+      text: raw.length > FETCH_CAP ? raw.slice(0, FETCH_CAP) : raw,
       headers: headerMap(response.headers),
     };
   } catch (error) {
@@ -134,7 +165,7 @@ export async function httpFetcher(url: string): Promise<FetchResult> {
       url,
       text: "",
       headers: {},
-      error: error instanceof Error ? error.message : "Network error",
+      error: fetchFailureMessage(error),
     };
   }
 }

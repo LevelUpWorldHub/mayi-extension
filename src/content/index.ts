@@ -1,7 +1,9 @@
 import { highlightQuote } from "../lib/highlight-dom";
 import { extractLinks, extractMeta } from "../lib/html";
+import { sameExtension } from "../lib/security";
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!sameExtension(sender.id, chrome.runtime.id)) return;
   if (message?.type === "MAYI_EXTRACT") {
     const html = document.documentElement?.innerHTML ?? "";
     const meta = extractMeta(html);

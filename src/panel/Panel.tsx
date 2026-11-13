@@ -1,10 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
-import { askPresets, askQuestion } from "../lib/ask";
+import { askPresets, askQuestion, isBlankQuestion } from "../lib/ask";
+import { answerExtractive } from "../lib/extractive";
+import { planHybridRoute } from "../lib/route";
 import type { CardModel } from "../lib/card";
 import { permissionMarkdown, renderCardPng } from "../lib/card";
 import type { SiteSnapshot } from "../lib/collect";
 import { detectConflicts, scrapingPosture, trainingPosture, type ConflictItem } from "../lib/conflicts";
+import { countImpact, impactLines } from "../lib/impact";
 import { LONG_DOCUMENT_CHARS } from "../lib/firebase";
 import { firebaseConfigPresent, getFirebaseStatus, initFirebase } from "../lib/firebase";
 import { PRESETS } from "../lib/presets";
@@ -22,6 +25,7 @@ export interface PanelProps {
   onShowClause: (url: string, quote: string) => void;
   onReread?: () => void;
   onChanges: (changes: WatchedChange[]) => void;
+  guide?: { tab: Tab; note: string } | null;
 }
 
 const TABS: { id: Tab; label: string }[] = [
@@ -59,6 +63,29 @@ function badge(path: InferencePath): string {
   return "Unreported";
 }
 
+function forYou(item: ConflictItem): string | null {
+  if (item.severity === "conflict" && item.topic === "training") {
+    return "For you: do not train on this. The files are not the permission the contract withholds.";
+  }
+  if (item.severity === "conflict" && item.topic === "scraping") {
+    return "For you: do not scrape this. A crawler allow-list does not beat the terms.";
+  }
+  if (item.severity === "tension") {
+    return "For you: the permission is narrow. Read the clause before you rely on the files.";
+  }
+  if (item.severity === "aligned") {
+    return "For you: the files and the contract tell the same story. Keep the clause anyway.";
+  }
+  return null;
+}
+
+function severityLabel(severity: ConflictItem["severity"]): string {
+  if (severity === "conflict") return "Files and contract disagree";
+  if (severity === "tension") return "The permission is narrow";
+  if (severity === "aligned") return "Files and contract agree";
+  return "One side is silent";
+}
+
 function severityClass(severity: ConflictItem["severity"]): string {
   if (severity === "conflict") return "border-seal/40 bg-[#f8e4dc] text-seal";
   if (severity === "tension") return "border-conditional/40 bg-[#f6ead2] text-conditional";
@@ -66,10 +93,12 @@ function severityClass(severity: ConflictItem["severity"]): string {
   return "border-line bg-paper text-muted";
 }
 
-export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause, onReread, onChanges }: PanelProps) {
+export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause, onReread, onChanges, guide }: PanelProps) {
   const [tab, setTab] = useState<Tab>("ask");
   const [question, setQuestion] = useState("May I ");
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [shownClause, setShownClause] = useState(false);
+  const [copiedQuote, setCopiedQuote] = useState<string | null>(null);
   const siteKey = snapshot?.pageUrl ?? "";
   const [seenSite, setSeenSite] = useState(siteKey);
   if (seenSite !== siteKey) {
@@ -77,12 +106,16 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
     setAnswers([]);
     setQuestion("May I ");
     setTab("ask");
+    setShownClause(false);
+    setCopiedQuote(null);
   }
   const [asking, setAsking] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
+  const [askError, setAskError] = useState<string | null>(null);
   const [replaying, setReplaying] = useState(false);
+  const askRef = useRef<HTMLInputElement | null>(null);
 
   const report = useMemo(
     () => (snapshot ? detectConflicts(snapshot.signals, snapshot.policies) : null),
@@ -91,10 +124,40 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   const firebase = firebaseConfigPresent();
   const [status] = useState(() => (firebase ? initFirebase() : getFirebaseStatus()));
   const policyChars = snapshot?.policies.reduce((sum, policy) => sum + policy.text.length, 0) ?? 0;
+  const cloudTrain = useMemo(() => {
+    if (!snapshot?.policies.length) return null;
+    const train = answerExtractive("May I train AI on it?", snapshot.policies, "train");
+    if (!train.quote) return null;
+    return planHybridRoute(snapshot.policies, train.question, train.quote).step === "cloud_retry" ? train : null;
+  }, [snapshot]);
+  const latestRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    latestRef.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+  }, [answers[0]?.id]);
+  useEffect(() => {
+    if (guide) setTab(guide.tab);
+  }, [guide?.tab, guide?.note]);
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const tag = (event.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      event.preventDefault();
+      setTab("ask");
+      askRef.current?.focus();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   async function ask(text: string, presetId?: string) {
-    if (!snapshot || !text.trim()) return;
+    if (!snapshot || isBlankQuestion(text)) {
+      if (snapshot) setAskError("Finish the question. For example: May I train AI on it?");
+      return;
+    }
     setAsking(text);
+    setAskError(null);
     setProgress(null);
     setTab("ask");
     try {
@@ -105,6 +168,8 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
         onDeviceProgress: (value) => setProgress(`Preparing Gemini Nano… ${Math.round(value * 100)}%`),
       });
       setAnswers((current) => [answer, ...current.filter((item) => item.question !== answer.question)]);
+    } catch (cause) {
+      setAskError(cause instanceof Error ? cause.message : "MayI couldn't answer that.");
     } finally {
       setAsking(null);
       setProgress(null);
@@ -114,24 +179,29 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   async function askUsual() {
     if (!snapshot) return;
     setAsking("usual");
+    setAskError(null);
     setTab("ask");
     try {
       const next = await askPresets(snapshot.policies, (done, total) => {
         setProgress(`Reading ${done} of ${total}`);
       }, (value) => setProgress(`Preparing Gemini Nano… ${Math.round(value * 100)}%`));
       setAnswers(next);
+    } catch (cause) {
+      setAskError(cause instanceof Error ? cause.message : "MayI couldn't answer the usual eight.");
     } finally {
       setAsking(null);
       setProgress(null);
     }
   }
 
+  const reading = snapshot && report ? impactLines(countImpact(snapshot, report, answers)) : [];
   const card: CardModel | null = snapshot
     ? {
         host: snapshot.host,
         title: snapshot.title,
         checkedAt: snapshot.fetchedAt,
         conflict: report?.primary && report.primary.severity !== "aligned" ? report.primary.headline : null,
+        reading,
         rows: (answers.length ? answers : []).map((answer) => ({
           question: answer.question,
           verdict: answer.verdict,
@@ -180,12 +250,17 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
   }
 
   return (
-    <section className="flex min-h-[36rem] flex-col bg-paper text-ink lg:h-full lg:min-h-0">
+    <section aria-labelledby="mayi-site-title" className="relative flex min-h-[36rem] flex-col bg-paper text-ink lg:h-full lg:min-h-0">
+      <a className="skip" href="#mayi-question">
+        Skip to the question
+      </a>
       <header className="border-b border-line px-4 py-3">
         <p className="font-serif text-xs uppercase tracking-[0.22em] text-seal">MayI · FinePrint</p>
         <div className="mt-1 flex items-start justify-between gap-3">
           <div>
-            <h1 className="font-serif text-2xl leading-none">{snapshot?.title ?? "No site yet"}</h1>
+            <h1 id="mayi-site-title" className="font-serif text-2xl leading-none">
+              {snapshot?.title ?? "No site yet"}
+            </h1>
             <p className="mt-1 text-sm text-muted">{snapshot?.host ?? "Open a page to read its terms."}</p>
           </div>
           {onReread ? (
@@ -194,26 +269,75 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
             </Button>
           ) : null}
         </div>
+        <ol className="beats" aria-label="Demo beats">
+          {[
+            { label: "Banner", done: Boolean(report?.primary) },
+            { label: "Answer", done: answers.length > 0 },
+            { label: "Clause", done: shownClause },
+          ].map((step, index) => (
+            <li key={step.label} data-done={step.done ? "true" : "false"}>
+              <span>{index + 1}</span>
+              {step.label}
+            </li>
+          ))}
+        </ol>
+        <p id="mayi-ask-hint" className="mt-2 text-xs text-muted" aria-live="polite">
+          Press / to ask.
+          {shownClause ? <span className="ml-2 font-semibold text-yes">Highlighted on the policy page.</span> : null}
+        </p>
       </header>
 
       {report?.primary ? (
-        <div className={`mx-4 mt-3 rounded-2xl border px-3 py-3 ${severityClass(report.primary.severity)}`}>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">
-            {report.primary.severity === "conflict" ? "Files and contract disagree" : report.primary.severity}
-          </p>
+        <div className={`mx-4 mt-3 rounded-2xl border px-3 py-3 ${severityClass(report.primary.severity)}`} role="status">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">{severityLabel(report.primary.severity)}</p>
           <p className="mt-1 font-serif text-lg leading-snug">{report.primary.headline}</p>
+          {forYou(report.primary) ? <p className="mt-1 text-sm font-semibold">{forYou(report.primary)}</p> : null}
+          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+            <div className="rounded-xl bg-white/50 px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide">Files</p>
+              <p className="mt-1">{report.primary.machineBrief}</p>
+            </div>
+            <div className="rounded-xl bg-white/50 px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide">Contract</p>
+              <p className="mt-1">{report.primary.policyQuote ?? report.primary.policySummary}</p>
+              {report.primary.policyQuote && report.primary.policyUrl ? (
+                <button
+                  type="button"
+                  className="linkish mt-2 text-seal"
+                  onClick={() => {
+                    setShownClause(true);
+                    onShowClause(report.primary?.policyUrl as string, report.primary?.policyQuote as string);
+                  }}
+                >
+                  Show this clause
+                </button>
+              ) : null}
+            </div>
+          </div>
         </div>
       ) : null}
 
-      <div className="mt-3 flex gap-1 px-4" role="tablist">
+      <div className="mt-3 flex gap-1 px-4" role="tablist" aria-label="MayI sections">
         {TABS.map((item) => (
           <button
             key={item.id}
             type="button"
             role="tab"
+            id={`mayi-tab-${item.id}`}
             aria-selected={tab === item.id}
-            className={`rounded-full px-3 py-1.5 text-sm font-semibold ${tab === item.id ? "bg-ink text-paper" : "text-muted hover:bg-paper-deep"}`}
+            aria-controls={`mayi-panel-${item.id}`}
+            tabIndex={tab === item.id ? 0 : -1}
+            className={`rounded-full px-3 py-1.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-seal ${tab === item.id ? "bg-ink text-paper" : "text-muted hover:bg-paper-deep"}`}
             onClick={() => setTab(item.id)}
+            onKeyDown={(event) => {
+              const index = TABS.findIndex((entry) => entry.id === item.id);
+              if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+                event.preventDefault();
+                const next = TABS[(index + (event.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length];
+                setTab(next.id);
+                document.getElementById(`mayi-tab-${next.id}`)?.focus();
+              }
+            }}
           >
             {item.label}
             {item.id === "changes" && changes.length ? ` ${changes.length}` : ""}
@@ -221,7 +345,13 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
+        role="tabpanel"
+        id={`mayi-panel-${tab}`}
+        aria-labelledby={`mayi-tab-${tab}`}
+        aria-busy={Boolean(asking) || loading}
+      >
         {loading ? <p className="text-sm text-muted">Fetching robots.txt, ai.txt, and the policy pages…</p> : null}
         {error ? (
           <p className="mb-3 rounded-xl border border-seal/30 bg-[#f8e4dc] px-3 py-2 text-sm text-seal" role="alert">
@@ -232,6 +362,14 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
           <div className="ruled rounded-2xl border border-line px-4 py-6">
             <p className="font-serif text-xl leading-snug">
               Point MayI at a site. It reads the terms, then answers in one sentence and shows the sentence it used.
+            </p>
+            <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-muted">
+              <li>Open any page on the site, then press This tab.</li>
+              <li>Read the banner first. It is the files on one side and the contract on the other.</li>
+              <li>Ask a question. Show this clause highlights the sentence on the policy page.</li>
+            </ol>
+            <p className="mt-3 text-sm">
+              For builders about to train or scrape, and for anyone about to accept a renewal or an arbitration clause.
             </p>
           </div>
         ) : null}
@@ -248,30 +386,49 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
               <input
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
+                id="mayi-question"
+                ref={askRef}
                 aria-label="May I question"
-                className="h-10 min-w-0 flex-1 rounded-full border border-line bg-white/60 px-4 text-sm outline-none focus:border-ink"
+                aria-keyshortcuts="/"
+                aria-describedby="mayi-ask-hint"
+                className="h-10 min-w-0 flex-1 rounded-full border border-line bg-white/60 px-4 text-sm outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-seal"
               />
               <Button type="submit" variant="seal" disabled={Boolean(asking)}>
                 Ask
               </Button>
             </form>
+            {cloudTrain && !answers.some((answer) => answer.presetId === "train") ? (
+              <div className="rounded-2xl border border-conditional/40 bg-[#f6ead2] px-3 py-3 text-sm text-conditional">
+                <p>The training ban sits past the excerpt Gemini Nano can read. The full page is still on this device.</p>
+                <Button className="mt-2" variant="outline" size="sm" disabled={Boolean(asking)} onClick={() => void ask(cloudTrain.question, "train")}>
+                  Show the cloud route
+                </Button>
+              </div>
+            ) : null}
             <div className="flex flex-wrap gap-1.5">
               {PRESETS.map((preset) => (
                 <button
                   key={preset.id}
                   type="button"
-                  className="rounded-full border border-line bg-white/50 px-2.5 py-1 text-xs font-semibold hover:border-ink"
+                  aria-busy={asking === preset.question}
+                  className="rounded-full border border-line bg-white/50 px-2.5 py-1 text-xs font-semibold hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-seal disabled:opacity-50"
+                  disabled={Boolean(asking)}
                   onClick={() => void ask(preset.question, preset.id)}
                 >
-                  {preset.question.replace(/^May I /, "").replace(/\?$/, "")}
+                  {asking === preset.question ? "Reading…" : preset.question.replace(/^May I /, "").replace(/\?$/, "")}
                 </button>
               ))}
             </div>
             <Button variant="outline" onClick={() => void askUsual()} disabled={Boolean(asking)}>
-              Answer the usual eight
+              {asking === "usual" ? "Reading the eight…" : "Answer the usual eight"}
             </Button>
-            {progress ? <p className="text-sm text-muted">{progress}</p> : null}
-            {policyChars > LONG_DOCUMENT_CHARS ? (
+            {progress ? <p className="text-sm text-muted" role="status">{progress}</p> : null}
+            {askError ? (
+              <p className="rounded-xl border border-seal/30 bg-[#f8e4dc] px-3 py-2 text-sm text-seal" role="alert">
+                {askError}
+              </p>
+            ) : null}
+            {policyChars > LONG_DOCUMENT_CHARS && !cloudTrain ? (
               <p className="text-xs text-muted">
                 This contract is longer than Gemini Nano’s excerpt. MayI ranks the matching clauses
                 {firebase ? " and can send a larger excerpt to the cloud, labeled Cloud." : "."}
@@ -280,10 +437,11 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
             {!snapshot.policies.length ? (
               <p className="text-sm text-muted">MayI couldn’t find a terms, privacy, or license page on this site.</p>
             ) : null}
-            {answers.map((answer) => (
-              <article key={answer.id} className="rounded-2xl border border-line bg-white/40 p-3">
+            <div aria-live="polite" className="space-y-3">
+            {answers.map((answer, index) => (
+              <article key={answer.id} ref={index === 0 ? latestRef : undefined} className="rounded-2xl border border-line bg-white/40 p-3">
                 <div className="flex gap-3">
-                  <div className={`stamp ${stampTone(answer.verdict, answer.tone)}`} aria-hidden>
+                  <div className={`stamp ${stampTone(answer.verdict, answer.tone)}`} role="img" aria-label={verdictLabel(answer.verdict)}>
                     {verdictWord(answer.verdict)}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -308,19 +466,46 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
                       <p className="mt-2 text-xs text-muted">No clause on the page matched this answer.</p>
                     )}
                     {answer.quote && answer.sourceUrl ? (
-                      <button
-                        type="button"
-                        className="mt-2 text-sm font-semibold text-seal underline-offset-2 hover:underline"
-                        onClick={() => onShowClause(answer.sourceUrl as string, answer.quote as string)}
-                      >
-                        Show this clause
-                      </button>
+                      <div className="mt-2 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          className="linkish text-seal"
+                          onClick={() => {
+                            setShownClause(true);
+                            onShowClause(answer.sourceUrl as string, answer.quote as string);
+                          }}
+                        >
+                          Show this clause
+                        </button>
+                        <button
+                          type="button"
+                          className="linkish"
+                          onClick={() => {
+                            const quote = answer.quote as string;
+                            void navigator.clipboard.writeText(quote).then(
+                              () => {
+                                setCopiedQuote(quote);
+                                window.setTimeout(() => setCopiedQuote(null), 1600);
+                              },
+                              () => setAskError("Couldn't copy that clause."),
+                            );
+                          }}
+                        >
+                          {copiedQuote === answer.quote ? "Copied" : "Copy clause"}
+                        </button>
+                      </div>
+                    ) : null}
+                    {answer.routeNote ? (
+                      <p className="mt-2 rounded-xl border border-conditional/40 bg-[#f6ead2] px-3 py-2 text-xs text-conditional">
+                        {answer.routeNote}
+                      </p>
                     ) : null}
                     <p className="mt-2 text-[11px] text-muted">{answer.inferenceDetail}</p>
                   </div>
                 </div>
               </article>
             ))}
+            </div>
           </div>
         ) : null}
 
@@ -359,6 +544,16 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
 
         {snapshot && tab === "card" ? (
           <div className="space-y-3">
+            {reading.length ? (
+              <div className="rounded-2xl border border-line bg-white/40 px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">This reading</p>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {reading.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {!card?.rows.length ? (
               <p className="text-sm text-muted">Answer the usual eight first. The card is the permission slip you can hand someone.</p>
             ) : (
@@ -392,7 +587,7 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
       <footer className="border-t border-line px-4 py-2 text-[11px] leading-relaxed text-muted">
         {status.configured
           ? `Firebase hybrid · cloud model ${status.cloudModel} · App Check ${status.appCheck}. `
-          : "Policies are read on this device. Add Firebase config to turn on Gemini Nano, with the cloud used only as fallback. "}
+          : "Policy text stays in local storage on this device. Add Firebase config to turn on Gemini Nano. The cloud, when it runs, receives an excerpt and the badge says Cloud. "}
         Not legal advice.
       </footer>
     </section>
@@ -423,6 +618,9 @@ function Signals({
   ];
   return (
     <div className="space-y-3">
+      <p className="text-sm">
+        Machine Readiness would stop at these files. CrawlPact does not read the contract. ToS;DR does not highlight the sentence on this page.
+      </p>
       <ul className="space-y-2 text-sm">
         {rows.map(([label, value]) => (
           <li key={label} className="rounded-xl border border-line bg-white/40 px-3 py-2">
@@ -433,7 +631,7 @@ function Signals({
       </ul>
       {items.map((item) => (
         <article key={item.id} className={`rounded-2xl border px-3 py-3 ${severityClass(item.severity)}`}>
-          <p className="text-[11px] font-semibold uppercase tracking-wide">{item.topic} · {item.severity}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide">{item.topic} · {severityLabel(item.severity)}</p>
           <p className="mt-1 font-serif text-base leading-snug">{item.headline}</p>
           <p className="mt-1 text-xs opacity-80">{item.machineSummary}</p>
           {item.policyQuote && item.policyUrl ? (

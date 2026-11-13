@@ -6,6 +6,14 @@ Machine-readable files already say what a crawler may do. The contract often say
 
 This is an entry for Google’s [#BuildHybridAI](https://devpost.com) hackathon. Judging closes Monday, November 30, 2026, 2:00 PM PT. It is a reading aid, not legal advice.
 
+## Try it
+
+```bash
+npm run lab
+```
+
+That installs dependencies the first time and serves the lab at <http://127.0.0.1:44731>. No Firebase keys. Press **Walk the three beats**: Northwind (files versus the contract), Lumen (the privacy diff), Sable Ferry (the clause past Gemini Nano). The badge says **Local reading** until `.env.local` is filled in from `.env.example`.
+
 ## The problem
 
 [Machine Readiness](https://machinereadiness.com/permission) reports what `robots.txt`, `ai.txt`, and TDM headers allow. [CrawlPact](https://crawlpact.com) audits a site’s declared crawler policy — `robots.txt`, meta robots, `X-Robots-Tag`, `llms.txt`, RSL, Content Signals — against a versioned crawler list. It does not run a model and it does not read the human contract. [ToS;DR](https://tosdr.org) crowdsources consumer-rights grades of terms.
@@ -17,7 +25,7 @@ MayI does four things:
 1. **Ask.** Preset questions (scrape, train, commercial use, screenshots, cancel anytime, sell my data, forced arbitration, auto-renewal) and anything you type that starts with “May I…?”. Each answer is Yes, No, or Conditional, one plain sentence, and the exact quoted clause. **Show this clause** scrolls the policy page and highlights that span.
 2. **Conflict.** `robots.txt`, `ai.txt`, `llms.txt`, TDMRep / `tdm-reservation`, and meta `noai` are merged into a posture. If the files allow AI training and the terms forbid it, that sentence is the headline.
 3. **Changes.** Policies are hashed in `chrome.storage.local` (or `localStorage` in the lab). The next time the wording changes, MayI shows the added and removed sentences and names the topic: selling personal information, arbitration, renewal, cancellation, training, scraping, screenshots.
-4. **Card.** A per-site permission card, exported as a PNG or as Markdown.
+4. **Card.** A per-site permission card, exported as a PNG or as Markdown. The card prints the counts for that reading: characters read on the device, machine-readable signals checked, file-versus-contract conflicts, and how many characters were sent to the cloud (zero until a cloud answer actually runs).
 
 Short policies are handled on the device. A document past Gemini Nano’s excerpt budget is chunked; if the on-device answer cannot be tied to a real quote, MayI retries in the cloud and the badge says **Cloud**. A quote the page does not contain is dropped, and the verdict becomes Unknown.
 
@@ -52,8 +60,8 @@ flowchart LR
   Files --> Panel
   Panel --> Parse
   Parse --> Store
-  Panel -->|PREFER_ON_DEVICE| Nano
-  Nano -->|model missing or doc too long| Cloud
+  Panel -->|countTokens, then a hybrid mode| Nano
+  Nano -->|excerpt missed the clause, or the prompt is over budget| Cloud
   Panel --> Off
   Off --> Bridge
   Bridge --> Check
@@ -83,16 +91,38 @@ import { getAI, getGenerativeModel, GoogleAIBackend, InferenceMode } from "fireb
 
 const ai = getAI(app, { backend: new GoogleAIBackend() });
 const model = getGenerativeModel(ai, {
-  mode: InferenceMode.PREFER_ON_DEVICE,
-  inCloudParams: { model: "gemini-3.5-flash-lite" },
+  mode: InferenceMode.ONLY_ON_DEVICE, // or PREFER_ON_DEVICE, ONLY_IN_CLOUD, PREFER_IN_CLOUD
+  onDeviceParams: {
+    createOptions: { expectedInputs: [{ type: "text", languages: ["en"] }] },
+    promptOptions: { responseConstraint: jsonSchema },
+  },
+  inCloudParams: {
+    model: "gemini-3.5-flash-lite",
+    systemInstruction,
+    generationConfig: { responseMimeType: "application/json", responseSchema, thinkingConfig: { thinkingLevel: "MINIMAL" } },
+  },
 });
 await model.initializeDeviceModel(onProgress); // from a user gesture
-const result = await model.generateContent(prompt);
-result.response.inferenceSource; // "on_device" or "in_cloud"
+const counted = await model.countTokens(prompt);
+const streamed = await model.generateContentStream(prompt);
+const result = await streamed.response;
+result.inferenceSource; // "on_device" or "in_cloud"
+result.usageMetadata;
 ```
 
-- Chrome 139+ desktop can run Gemini Nano. `PREFER_ON_DEVICE` uses it when the model is downloaded and falls back to the cloud when it is not.
-- On-device context is about 9,216 tokens. MayI sends at most ~6,000 characters of ranked excerpts. Past ~12,000 characters of policy text, a missing quote triggers one cloud retry with a larger excerpt (~18,000 characters). The badge on that answer says **Cloud**.
+The mode is chosen in `src/lib/hybrid-plan.ts`, not hardcoded:
+
+| Situation | Mode |
+| --- | --- |
+| Nano has not been initialized yet | `PREFER_ON_DEVICE` |
+| Nano is ready and `countTokens` fits the on-device budget | `ONLY_ON_DEVICE` |
+| The on-device excerpt has no citable clause, or the token count is over budget | `ONLY_IN_CLOUD` |
+| `initializeDeviceModel` failed | `PREFER_IN_CLOUD` |
+
+A reply that is not JSON gets one `startChat` repair turn. If the stream fails, the same prompt is sent with `generateContent`.
+
+- Chrome 139+ desktop can run Gemini Nano. `PREFER_ON_DEVICE` uses it when the model is downloaded and falls back to the cloud when it is not. `ONLY_ON_DEVICE` is used only after Nano has initialized, so a missing model does not fail the question: that failure flips the session to `PREFER_IN_CLOUD`.
+- On-device context is about 9,216 tokens. MayI sends at most ~6,000 characters of ranked excerpts, and the cloud retry may send about 18,000. Past 12,000 characters, a clause that is missing from the on-device excerpt triggers one cloud retry. The badge on that answer says **Cloud**. Sable Ferry is the sample that shows this: without Firebase keys the card says **Cloud route** and still quotes the real sentence from the full page.
 - The displayed quote must be a real span from the page (`locateQuote`). A preset classifier can correct the verdict when it disagrees with the model about that span.
 - With no Firebase config, MayI still answers. That path is a local clause matcher. The badge says **Local reading**. It is not Gemini.
 
@@ -132,12 +162,12 @@ Not in this entry. Firebase AI Logic’s `prefer_on_device` mode is the same ide
 Requirements: Node 22+, Chrome 139+ if you want Gemini Nano. The lab runs without Chrome and without Firebase keys.
 
 ```bash
-npm install
-npm test
-npm run dev
+npm run lab
 ```
 
-Open [the lab](http://127.0.0.1:44731). `npm install` uses legacy peer deps (see `.npmrc`) because npm 10’s installer crashes on Vitest’s optional peer graph.
+That is the one command. It runs `npm install` when `node_modules` is missing, then serves [the lab](http://127.0.0.1:44731). `npm install` uses legacy peer deps (see `.npmrc`) because npm 10’s installer crashes on Vitest’s optional peer graph.
+
+`npm test` and `npm run dev` are still there if you want them separately.
 
 Load the extension:
 
@@ -151,7 +181,7 @@ Sample pages are also packed inside the extension at `dist/samples/` so the offl
 
 ## Samples
 
-Four fictional sites live in `public/samples/`. The prose is original. It is not copied from anyone’s terms.
+Five fictional sites live in `public/samples/`. The prose is original. It is not copied from anyone’s terms.
 
 | Site | What to look at |
 | --- | --- |
@@ -159,6 +189,7 @@ Four fictional sites live in `public/samples/`. The prose is original. It is not
 | Lumen Health | Files and contract agree: no training, no scraping. The privacy policy now sells location data. **Changes** shows that against the stored previous copy. Arbitration and auto-renewal are in the terms. |
 | Kindred Press | `ai.txt` is only at `/.well-known/ai.txt`. Training is conditional on both sides: you may train if you give credit. |
 | Pinnacle | A long contract. Scraping is allowed only through the documented API while `ai.txt` denies scraping, so the signals tab shows tension. Cancellation is by certified mail. |
+| Sable Ferry | Longer than Gemini Nano’s excerpt. The files allow training. The ban is a single sentence past the on-device window, so the answer card says **Cloud route**. With Firebase configured, that retry is badged Cloud. |
 
 ## Tests
 
@@ -167,7 +198,7 @@ npm test
 npm run typecheck
 ```
 
-`tests/mayi.test.ts` covers the robots parser (including Content-Signal), the ai.txt directive parser, llms.txt opt-out language, TDM reservation merging, clause citation (exact, whitespace-normalized, and fuzzy), chunk selection around a late keyword, the policy diff, and all four sample sites: verdicts, the Northwind conflict, the Kindred well-known path, the Lumen privacy diff, and Pinnacle’s length.
+`tests/mayi.test.ts` covers the robots parser (including Content-Signal), the ai.txt directive parser, llms.txt opt-out language, TDM reservation merging, clause citation (exact, whitespace-normalized, and fuzzy), chunk selection around a late keyword, the policy diff, and the sample sites: the Northwind conflict, the Kindred well-known path, the Lumen privacy diff, Pinnacle’s tension, and Sable Ferry’s cloud route (the on-device excerpt misses the training ban, the cloud excerpt contains it).
 
 GitHub Actions (`.github/workflows/ci.yml`) runs `npm ci`, the tests, the typecheck, and `npm run build` on Node 22. The build does not need a `.env` file.
 

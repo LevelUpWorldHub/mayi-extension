@@ -30,3 +30,5 @@ h1 { font-weight: 560; letter-spacing: -0.03em; line-height: 1.1; }
 .pinnacle { background: #f4f6fb; font-family: "Avenir Next", "Segoe UI", sans-serif; }
 .pinnacle .nav, .pinnacle .footer { background: #1e2a4a; }
 .pinnacle h1, .pinnacle h2 { font-family: Georgia, serif; }
+.sable { background: #f4f1ea; }
+.sable .nav, .sable .footer { background: #1d3a4a; }

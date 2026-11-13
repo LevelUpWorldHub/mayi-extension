@@ -1,8 +1,11 @@
+import { isPublicHttpUrl, sameExtension } from "../lib/security";
+
 chrome.runtime.onInstalled.addListener(() => {
   void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!sameExtension(sender.id, chrome.runtime.id)) return;
   if (message?.type !== "MAYI_OPEN_CLAUSE") return;
   void openClause(String(message.url ?? ""), String(message.quote ?? "")).then(
     (ok) => sendResponse({ ok }),
@@ -38,8 +41,9 @@ async function highlight(tabId: number, quote: string): Promise<void> {
 }
 
 async function openClause(url: string, quote: string): Promise<boolean> {
+  if (!isPublicHttpUrl(url) || quote.length > 2_000) return false;
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  if (!tab?.id || !url) return false;
+  if (!tab?.id) return false;
   await chrome.tabs.update(tab.id, { url });
   await waitForComplete(tab.id);
   await highlight(tab.id, quote);

@@ -1,0 +1,5 @@
+# Sable Ferry
+
+> Sailing times for the island run.
+
+- [Sailings](https://sable.example/): the public board

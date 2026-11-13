@@ -9,6 +9,8 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 44731 --strictPort",
+    "lab": "node scripts/lab.mjs",
+    "setup": "npm install",
     "build": "node scripts/make-icons.mjs && node scripts/build-extension.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",

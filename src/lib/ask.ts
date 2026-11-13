@@ -1,7 +1,20 @@
 import { answerExtractive } from "./extractive";
 import { askFirebase, firebaseConfigPresent, initFirebase, prepareOnDeviceModel } from "./firebase";
+import { planHybridRoute } from "./route";
 import { presetById, presetForQuestion, PRESETS } from "./presets";
 import type { Answer, PolicyDoc } from "./types";
+
+function noteRoute(answer: Answer, docs: PolicyDoc[]): Answer {
+  if (!answer.quote || answer.inference === "on_device" || answer.inference === "cloud") return answer;
+  const plan = planHybridRoute(docs, answer.question, answer.quote);
+  if (plan.step !== "cloud_retry") return answer;
+  return { ...answer, routeNote: plan.note };
+}
+
+export function isBlankQuestion(question: string): boolean {
+  const trimmed = question.trim().toLowerCase().replace(/[?.!]+$/g, "").trim();
+  return trimmed.length === 0 || trimmed === "may i";
+}
 
 export async function askQuestion(options: {
   question: string;
@@ -10,11 +23,27 @@ export async function askQuestion(options: {
   onDeviceProgress?: (value: number) => void;
 }): Promise<Answer> {
   const question = options.question.trim();
+  if (isBlankQuestion(question)) {
+    return {
+      id: crypto.randomUUID(),
+      question: question || "May I",
+      presetId: options.presetId ?? null,
+      tone: "permission",
+      verdict: "unknown",
+      reason: "Finish the question. For example: May I train AI on it?",
+      quote: null,
+      sourceUrl: null,
+      sourceTitle: null,
+      citation: null,
+      inference: "extractive",
+      inferenceDetail: "Local reading — there was no question to match.",
+    };
+  }
   const preset = presetById(options.presetId) ?? presetForQuestion(question);
   const presetId = preset?.id ?? options.presetId ?? null;
   if (!firebaseConfigPresent()) {
     const local = answerExtractive(question, options.docs, presetId);
-    return { ...local, question };
+    return noteRoute({ ...local, question }, options.docs);
   }
   initFirebase();
   try {
@@ -32,11 +61,14 @@ export async function askQuestion(options: {
   } catch (error) {
     const local = answerExtractive(question, options.docs, presetId);
     const message = error instanceof Error ? error.message : "Firebase request failed.";
-    return {
-      ...local,
-      question,
-      inferenceDetail: `Local reading — Firebase didn't answer (${message}).`,
-    };
+    return noteRoute(
+      {
+        ...local,
+        question,
+        inferenceDetail: `Local reading — Firebase didn't answer (${message}).`,
+      },
+      options.docs,
+    );
   }
 }
 

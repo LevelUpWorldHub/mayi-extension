@@ -39,21 +39,25 @@ export async function recordPolicies(
 ): Promise<WatchedChange[]> {
   const changes: WatchedChange[] = [];
   for (const policy of snapshot.policies) {
-    await seedLumenPrevious(policy, fetcher, store);
-    const result = await store.commit({
-      url: policy.url,
-      host: snapshot.host,
-      kind: policy.kind,
-      title: policy.title,
-      text: policy.text,
-      fetchedAt: snapshot.fetchedAt,
-    });
-    if (!result.record.previous) continue;
-    changes.push({
-      policy,
-      previousAt: result.record.previous.fetchedAt,
-      diff: diffPolicies(result.record.previous.text, result.record.text),
-    });
+    try {
+      await seedLumenPrevious(policy, fetcher, store);
+      const result = await store.commit({
+        url: policy.url,
+        host: snapshot.host,
+        kind: policy.kind,
+        title: policy.title,
+        text: policy.text,
+        fetchedAt: snapshot.fetchedAt,
+      });
+      if (!result.record.previous) continue;
+      changes.push({
+        policy,
+        previousAt: result.record.previous.fetchedAt,
+        diff: diffPolicies(result.record.previous.text, result.record.text),
+      });
+    } catch {
+      // One policy failing to store should not drop the answers for the rest.
+    }
   }
   return changes;
 }

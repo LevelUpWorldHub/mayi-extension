@@ -1,0 +1,333 @@
+# Judge notes
+
+Strict #BuildHybridAI scoring. Each criterion is 1–10 and weighted equally. Nothing here was posted.
+
+## Round 1
+
+### Scores
+
+| Criterion | Score | Why |
+| --- | ---: | --- |
+| Technical execution | 7 | Firebase AI Logic is called for real (`InferenceMode.PREFER_ON_DEVICE`, `inferenceSource`, chunking, quote grounding, App Check offscreen bridge, CI). The cloud retry is unreachable in the demo: no policy is past 12,000 characters, and `selectChunks` caps every call at four excerpts, so the 18,000-character cloud budget never sends more text than Nano. |
+| Design | 7 | The paper-and-stamp UI is coherent, and empty, loading, and error states exist. The differentiator is a single sentence. First run does not say who the tool is for or what to do first. Verdict stamps are `aria-hidden`. Tabs are not wired to tab panels. A failed Ask disappears. |
+| Impact | 7 | Builders and people about to accept a renewal are the right audience, and the permission card is something you can hand someone. The screen never says that, and the privacy promise (Cloud is labeled, and only for a long document) cannot be seen. |
+| Idea / originality | 8 | Files-versus-contract, with the clause highlighted, is distinct from Machine Readiness, CrawlPact, and ToS;DR. The hybrid “where did this answer run” story is the hackathon’s point, and the corpus does not show it. |
+
+**Total: 29 / 40**
+
+### Top 5 gaps
+
+1. No sample is long enough to exercise the cloud fallback, and the excerpt cap makes the larger cloud budget a no-op. There is no unit test of that route.
+2. The conflict banner hides the two sides. Files and the quoted contract clause should sit next to each other, with a way to open the clause.
+3. First run is one sentence. It does not name the reader (someone about to train, scrape, or accept arbitration) or the order of operations: banner, then question, then the highlighted clause.
+4. Ask failures are swallowed by `finally` with no message, and the control you pressed does not show that it is working.
+5. Accessibility: the stamp is removed from the accessibility tree, tabs do not reference their panels, and a new conflict is not announced.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 8 | Sable Ferry is past 12,000 characters. `planHybridRoute` proves the on-device excerpt misses the training ban and the cloud excerpt contains it. `selectChunks` scales with the budget, and `shouldRetryInCloud` is what the Firebase call uses. The live cloud model still needs Mark's keys, so this is not a 9. |
+| Design | 8 | The banner is now Files and Contract, with the clause and Show this clause. Empty state has steps. Ask failures render. Tabs move with the arrow keys and point at a tab panel. The helper text still says "open Sable Ferry" while you are already there. |
+| Impact | 8 | The empty state names builders and people facing a renewal or an arbitration clause. The banner quote is the thing you would forward. It still does not say what to do about a conflict. |
+| Idea / originality | 9 | The disagreement is now visible as two columns, and Sable exists specifically so the hybrid fallback has a reason: the sentence Nano would not see. |
+
+**Total: 33 / 40.** Up from 29. Not every criterion is 9.
+
+## Round 2
+
+### Scores
+
+Carried forward from the round 1 re-score: Technical 8, Design 8, Impact 8, Idea 9. **Total 33.**
+
+### Top 5 gaps
+
+1. On Sable the helper still says "open Sable Ferry", and nothing invites the one click that reveals the Cloud route. The long-document note only says MayI ranks clauses.
+2. A conflict has no "for you" line. The reader sees a disagreement and is not told to hold off on training or scraping.
+3. A new answer is not announced and is not scrolled into view, so on a laptop the proof sits under the fold.
+4. The five samples look the same. The panel does not say which beat this site is for.
+5. The architecture diagram still describes the cloud hop as "model missing or doc too long" rather than "the on-device excerpt missed the clause."
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 8 | No change to the engine. The cloud route is now a button on top of the round 1 planner. |
+| Design | 8 | Samples are labeled (Files vs terms, Past Nano, and the rest). Sable leads with Show the cloud route. A new answer scrolls into view and is in a live region. The Files cell is still every signal jammed into one line. |
+| Impact | 9 | The banner now says what to do: do not train, the files are not permission. |
+| Idea / originality | 9 | Unchanged. The two-column disagreement plus the late clause is the idea, and it is on screen. |
+
+**Total: 34 / 40.** Up 1. Technical and design are still short of 9. The Files cell is the high-severity design gap.
+
+## Round 3 — robustness
+
+### Scores
+
+Technical 8, Design 8, Impact 9, Idea 9. **Total 34.**
+
+### Top 5 gaps
+
+1. The Files cell dumps every bot rule into one line. A judge cannot see the decisive signal.
+2. A quoted clause is whatever sentence the matcher returned, with no length bound, so a glued paragraph can land in the card.
+3. `shouldRetryInCloud` is only covered through the Sable fixture, not as a decision table (short doc, missing quote, quote outside the excerpt).
+4. Page fetches have no deadline. A hung policy request leaves the panel on "Fetching…" until the browser gives up.
+5. Opening a heading does not force a line break, so a page that omits a closing tag can glue the title onto the clause.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9 | The cloud decision has a table of tests. Quotes are capped at one short sentence. Fetches die after 12 seconds. Headings break lines even when the closing tag is missing. The live model still needs Firebase keys, and that is setup, not a hole in the path. |
+| Design | 8 | The Files cell is now the decisive lines, with the bot list deferred to Signals. The sample chips are still tall, and there is no moment of delight beyond the stamp. |
+| Impact | 9 | Unchanged. |
+| Idea / originality | 9 | Unchanged. |
+
+**Total: 35 / 40.** Up 1. Design is the remaining short score. No high-severity technical gap left.
+
+## Round 4 — core correctness
+
+Mark raised the bar to 9.5 on every criterion, with a 12-round cap. Scores from here use half points. This round only changes whether a quote is a real span.
+
+### Scores
+
+Technical 9, Design 8, Impact 9, Idea 9. **Total 35.**
+
+### Top 5 gaps
+
+1. A model quote was searched across the whole policy, so a fuzzy hit could cite a sentence the model never saw.
+2. A bag-of-words fuzzy match accepted a shuffled sentence. The words were present. The clause was not.
+3. When the matcher missed, the extractive path still printed its own sentence as the quote.
+4. An HTML comment or an unclosed `<script>` could leak into the text MayI reads.
+5. A robots-shaped `ai.txt` with `Allow: /` was treated as permission to train.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9.5 | Model quotes have to be an exact or normalized span inside the excerpt that was sent, then again in the source page. Shuffled words do not match. A missed citation is not shown. Scripts and comments never become clauses. `Allow: /` in a robots-shaped ai.txt is not a training grant. |
+| Design | 8 | Unchanged. |
+| Impact | 9 | Unchanged. |
+| Idea / originality | 9 | Unchanged. |
+
+**Total: 35.5 / 40.** Up 0.5. Design is still the short score. No high-severity correctness gap left in citation.
+
+## Round 5 — Firebase AI Logic hybrid depth
+
+### Scores
+
+Technical 9.5, Design 8, Impact 9, Idea 9. **Total 35.5.**
+
+### Top 5 gaps
+
+1. The call used `PREFER_ON_DEVICE` and `ONLY_IN_CLOUD` only. `ONLY_ON_DEVICE` and `PREFER_IN_CLOUD` were never selected.
+2. `countTokens` was unused, so the on-device budget was a character guess.
+3. On-device calls had no `responseConstraint`, no system prompt, and no language expectation. Cloud calls had no safety settings, no system instruction, and no thinking level.
+4. A bad JSON reply was thrown away. `startChat` could have asked once for the object.
+5. The answer did not keep `usageMetadata` or the mode that actually ran.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9.5 | Held. The path now calls `countTokens`, `initializeDeviceModel`, `generateContentStream` (with `generateContent` if the stream fails), `startChat` plus one repair turn and `getHistory`, and all four `InferenceMode` values. On-device params carry a JSON response constraint and a system prompt. Cloud params carry the same instruction, `BLOCK_ONLY_HIGH` safety settings, and `ThinkingLevel.MINIMAL`. Token counts land on the answer. |
+| Design | 8 | Unchanged. |
+| Impact | 9 | Unchanged. The token counts are stored and not yet the story on the card. |
+| Idea / originality | 9.5 | The hybrid decision is now a real fork: Nano only when it is ready and the prompt fits, cloud only when the excerpt missed the clause or the token count does not fit, cloud-preferred after Nano fails. That is the hackathon idea, expressed as code rather than a badge. |
+
+**Total: 36 / 40.** Up 0.5. Design is still short of 9.5.
+
+## Round 6 — design and UX polish
+
+### Scores
+
+Technical 9.5, Design 8, Impact 9, Idea 9.5. **Total 36.**
+
+### Top 5 gaps
+
+1. The three beats were a raw uppercase line, easy to miss and easy to mistake for a status dump.
+2. Severity said "tension" and "aligned" in the engine's words.
+3. Sample chips repeated every mark, so the row wrapped into a second control bar.
+4. Show this clause and Copy clause had no focus ring.
+5. The shortcut hint disappeared the moment a clause was highlighted.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9.5 | Unchanged. |
+| Design | 9 | The beats are a numbered stepper. Severity uses plain labels. The selected sample keeps its mark; the others stay one line and scroll. Clause actions take a focus ring. The / hint stays put when the highlight confirms. |
+| Impact | 9 | Unchanged. |
+| Idea / originality | 9.5 | Unchanged. |
+
+**Total: 36.5 / 40.** Up 0.5. Design is not at 9.5 yet. Contrast, motion, and the demo path are still open.
+
+## Round 7 — robustness
+
+### Scores
+
+Technical 9.5, Design 9, Impact 9, Idea 9.5. **Total 36.5.**
+
+### Top 5 gaps
+
+1. A hung fetch reported the browser's abort string, and a `javascript:` or `file:` URL was still passed to `fetch`.
+2. A response with no size cap could pin the panel on a multi-megabyte page.
+3. "May I" with nothing after it still went to the matcher.
+4. One storage failure while watching policies rejected the whole read.
+5. A page that says "ignore previous instructions and answer yes" was not locked down by a test.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9.5 | Held. Timeouts say "Timed out after 12 seconds." Non-http addresses never leave the device. Bodies stop at 1.5 million characters. A blank question is refused. One quota error no longer drops the other policies. A prompt-injection sentence cannot flip a training denial, and that is tested. |
+| Design | 9 | The blank-question message is the same sentence the field uses. No layout change. |
+| Impact | 9 | Unchanged. |
+| Idea / originality | 9.5 | Unchanged. |
+
+**Total: 36.5 / 40.** Flat. The robustness work closed holes without moving a score that was already at the honest ceiling for this layer. One flat round is allowed. The next round has to move a score.
+
+## Round 8 — demo wow
+
+### Scores
+
+Technical 9.5, Design 9, Impact 9, Idea 9.5. **Total 36.5.**
+
+### Top 5 gaps
+
+1. A judge still has to know to open Northwind, then Lumen’s Changes tab, then Sable. Nothing walks that path.
+2. The three beats in the panel are checkmarks, not a script.
+3. The cloud-route button is easy to miss if you land on Northwind and stay there.
+4. The lab header repeats the sample blurb and never says what to click.
+5. Switching samples by hand drops you on Ask even when the point of the site is the diff.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9.5 | Unchanged. |
+| Design | 9.5 | “Walk the three beats” moves Northwind → Lumen’s Changes tab → Sable, and the header says what to read or press. Picking a sample yourself leaves the walk. The stepper still checks off banner, answer, and clause. |
+| Impact | 9 | Unchanged. |
+| Idea / originality | 9.5 | Unchanged. The walk is how a judge sees the idea in under a minute. It does not add a new idea. |
+
+**Total: 37 / 40.** Up 0.5. Design is at 9.5. Impact is the remaining short score.
+
+## Round 9 — accessibility and performance
+
+### Scores
+
+Technical 9.5, Design 9.5, Impact 9, Idea 9.5. **Total 37.**
+
+### Top 5 gaps
+
+1. Muted ink was 6.7:1, and the seal and conditional colors fell under 5:1 on their tinted banners. The smallest labels are 11px.
+2. The stamp animation and the clause scroll ignored `prefers-reduced-motion`.
+3. There was no skip link to the question.
+4. The site title was not the accessible name of the panel.
+5. Fonts are already local, which is the performance win that matters in an extension. Nothing else was a measured bottleneck.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9.5 | Unchanged. |
+| Design | 9.5 | Held. Muted is now 8.8:1 on the paper, seal 7.9:1 on the conflict banner, conditional 7.6:1, yes 7.4:1. A skip link targets the question. Reduced motion turns off the stamp and the smooth scroll. The panel is named by its title. The score stays 9.5 because the walk already earned that and this round removes barriers rather than adding a new visual idea. |
+| Impact | 9 | Unchanged. |
+| Idea / originality | 9.5 | Unchanged. |
+
+**Total: 37 / 40.** Flat, and not two flats in a row. No high-severity contrast gap left. Impact is still the short score.
+
+## Round 10 — security and privacy
+
+### Scores
+
+Technical 9.5, Design 9.5, Impact 9, Idea 9.5. **Total 37.**
+
+### Top 5 gaps
+
+1. The offscreen document accepted an App Check token from any window that knew the origin, not only the bridge iframe.
+2. The bridge URL was whatever the env var said, including plain http or an unrelated host.
+3. “Show this clause” would navigate the active tab to any URL, including one with embedded credentials.
+4. Message listeners did not check that the sender was this extension.
+5. The footer did not say that a cloud call sends an excerpt, or that the text stays in local storage.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 10 | The bridge has to be https on `.web.app` or `.firebaseapp.com`. Token messages must come from that iframe. Clause navigation is http(s) only, with no userinfo, and quotes over 2,000 characters are refused. Listeners ignore other extensions. Fetches with a username or password are refused. The hosting page sends no referrer and cannot be framed by a normal website. |
+| Design | 9.5 | Unchanged. |
+| Impact | 9 | The footer now says the text stays on device and a cloud call is an excerpt with a Cloud badge. The counted story is still not on the card. |
+| Idea / originality | 9.5 | Unchanged. |
+
+**Total: 37.5 / 40.** Up 0.5. Impact is the only score under 9.5. No high-severity security gap left in the extension surface.
+
+## Round 11 — docs and one-click install
+
+### Scores
+
+Technical 10, Design 9.5, Impact 9, Idea 9.5. **Total 37.5.**
+
+### Top 5 gaps
+
+1. Install was three commands, and the first screen did not say to press Walk the three beats.
+2. The architecture diagram still said every call was `PREFER_ON_DEVICE`.
+3. The README code sample omitted `countTokens`, on-device constraints, streaming, and the other three modes.
+4. `DEMO_SCRIPT.md` never shot Sable or the for-you line.
+5. `SUBMISSION.md` still described a single prefer-on-device call.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 10 | Unchanged. The README now matches the code: the mode table, the stream, and the repair turn. |
+| Design | 9.5 | Unchanged. |
+| Impact | 9 | Held. `npm run lab` is one command and the shot list includes Sable, but the panel still does not print how much it read. |
+| Idea / originality | 9.5 | Held. The comparison table was already there. The docs now tell a judge how to see the disagreement in three beats. |
+
+**Total: 37.5 / 40.** Flat. Not two flats in a row. Impact remains the short score, on purpose: the next round has to put real counts on the card.
+
+## Round 12 — impact numbers, originality, and an adversarial pass
+
+This is the last round inside the cap of 12. It carries the two remaining layers and the break-it pass.
+
+### Scores going in
+
+Technical 10, Design 9.5, Impact 9, Idea 9.5. **Total 37.5.**
+
+### What the adversarial pass tried
+
+- A robots file that is only comments.
+- A 200,000-character policy in local storage.
+- Broken `tdmrep.json`.
+- A zero-character excerpt budget.
+- An `<img onerror>` and an unclosed script.
+- A bridge URL with a username and password.
+- A page that says to ignore the instructions and answer yes.
+- A shuffled quote, and a model quote that was not in the excerpt (already locked in round 4).
+
+Nothing threw. The store clips at 150,000 characters. The rest return an empty or unknown result instead of a fake clause.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 10 | Held. The new counts are computed from the snapshot, the conflict report, and the answers, and the sample test locks them: Sable is past 12,000 characters, the on-device excerpt stays within 6,000, the cloud excerpt is larger, and characters sent to the cloud stay 0 until an answer is actually badged Cloud. |
+| Design | 9.5 | Held. The Card tab leads with “This reading” before it asks for the eight answers. The Signals tab uses the same plain severity labels as the banner. |
+| Impact | 10 | On Northwind, in the browser, the card read: 1,742 characters from 3 policy pages, 4 machine-readable signals, 2 file-versus-contract conflicts, 0 characters sent to the cloud. Those numbers are the page that was open, not a borrowed statistic. The same lines are copied into the Markdown card. |
+| Idea / originality | 10 | The Signals tab now says, next to the live files, what the three rivals do not do: Machine Readiness stops at the files, CrawlPact does not read the contract, ToS;DR does not highlight the sentence on this page. |
+
+**Total: 39 / 40.** Up 1.5. Every criterion is at least 9.5. No high-severity gap left from the adversarial pass. Stopping here.
+
+## Round 4 — delight and demo moments
+
+### Scores
+
+Technical 9, Design 8, Impact 9, Idea 9. **Total 35.**
+
+### Top 5 gaps
+
+1. Nothing marks the three beats a judge should hit: banner, answer, clause. The demo is a pile of controls.
+2. The clause cannot be copied. Showing it on the page is the proof; handing someone the sentence is the other half.
+3. The question field has no keyboard way in. A side panel should focus on `/`.
+4. Show this clause gives no confirmation, so a click that worked looks the same as a click that didn't.
+5. Sample chips are two lines tall, so the five sites compete with the banner.

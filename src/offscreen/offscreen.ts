@@ -1,3 +1,5 @@
+import { isAllowedBridgeUrl, sameExtension } from "../lib/security";
+
 const bridgeUrl = (import.meta.env.VITE_APPCHECK_BRIDGE_URL ?? "").trim();
 
 let frame: HTMLIFrameElement | null = null;
@@ -5,6 +7,9 @@ let ready: Promise<void> | null = null;
 
 function ensureFrame(): Promise<void> {
   if (!bridgeUrl) return Promise.reject(new Error("VITE_APPCHECK_BRIDGE_URL is not set."));
+  if (!isAllowedBridgeUrl(bridgeUrl)) {
+    return Promise.reject(new Error("App Check bridge must be an https Firebase Hosting URL."));
+  }
   if (ready) return ready;
   ready = new Promise((resolve, reject) => {
     const iframe = document.createElement("iframe");
@@ -31,7 +36,8 @@ function ensureFrame(): Promise<void> {
 
 function requestToken(): Promise<{ token: string; expireTimeMillis: number }> {
   const iframe = frame;
-  if (!iframe?.contentWindow) return Promise.reject(new Error("App Check bridge is not loaded."));
+  const bridgeWindow = iframe?.contentWindow;
+  if (!iframe || !bridgeWindow) return Promise.reject(new Error("App Check bridge is not loaded."));
   const origin = new URL(bridgeUrl).origin;
   return new Promise((resolve, reject) => {
     const timeout = window.setTimeout(() => {
@@ -39,7 +45,7 @@ function requestToken(): Promise<{ token: string; expireTimeMillis: number }> {
       reject(new Error("App Check bridge did not return a token."));
     }, 20000);
     function onMessage(event: MessageEvent) {
-      if (event.origin !== origin || event.data?.source !== "mayi-app-check") return;
+      if (event.origin !== origin || event.source !== bridgeWindow || event.data?.source !== "mayi-app-check") return;
       window.clearTimeout(timeout);
       window.removeEventListener("message", onMessage);
       if (!event.data.token) {
@@ -53,7 +59,8 @@ function requestToken(): Promise<{ token: string; expireTimeMillis: number }> {
   });
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!sameExtension(sender.id, chrome.runtime.id)) return;
   if (message?.type !== "APP_CHECK_TOKEN") return;
   void ensureFrame()
     .then(() => requestToken())

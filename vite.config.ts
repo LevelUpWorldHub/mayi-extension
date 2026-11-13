@@ -11,7 +11,7 @@ function sampleHeaders(): Plugin {
         if (url.includes("/samples/lumen/")) {
           res.setHeader("tdm-reservation", "1");
           res.setHeader("tdm-policy", "https://lumen.example/privacy");
-        } else if (url.includes("/samples/northwind/")) {
+        } else if (url.includes("/samples/northwind/") || url.includes("/samples/sable/")) {
           res.setHeader("tdm-reservation", "0");
         } else if (url.includes("/samples/pinnacle/")) {
           res.setHeader("x-robots-tag", "noai, noimageai");

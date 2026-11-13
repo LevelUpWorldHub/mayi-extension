@@ -14,7 +14,7 @@ FinePrint. Ask “May I…?” and get the clause, plus the fight between robots
 
 Sites already publish two answers. A robots file tells crawlers what to do. A terms page tells humans something else, often the opposite. Machine Readiness, CrawlPact, and ToS;DR each cover one of those layers. MayI reads both.
 
-On any site, the Chrome side panel answers “May I scrape this?”, “May I train on it?”, “Do they sell my data?”, and questions you type. The verdict is yes, no, or conditional, in one sentence, with the exact quoted clause highlighted on the policy page. When ai.txt allows training and the terms forbid it, that conflict is the headline. Policies are hashed on the device, and the next visit shows a plain-English diff. Inference goes through Firebase AI Logic in prefer-on-device mode, so Gemini Nano answers first and the cloud is a labeled fallback. App Check with reCAPTCHA Enterprise is required before a cloud call.
+On any site, the Chrome side panel answers “May I scrape this?”, “May I train on it?”, “Do they sell my data?”, and questions you type. The verdict is yes, no, or conditional, in one sentence, with the exact quoted clause highlighted on the policy page. When ai.txt allows training and the terms forbid it, that conflict is the headline. Policies are hashed on the device, and the next visit shows a plain-English diff. Inference goes through Firebase AI Logic. `countTokens` picks among all four hybrid modes: prefer on-device, only on-device once Nano is ready, cloud only when the excerpt missed the clause, and prefer-in-cloud if Nano fails to initialize. The cloud is labeled. App Check with reCAPTCHA Enterprise is required before a cloud call. A quote that is not a real span in the excerpt is dropped.
 
 ## Built with
 
@@ -32,10 +32,10 @@ On any site, the Chrome side panel answers “May I scrape this?”, “May I tr
 
 ## Try it
 
-1. Clone the repo and run `npm install` and `npm run dev`.
-2. Open the lab. Start on Northwind Archive. The banner should already say the files allow AI training and the terms forbid it.
-3. Press **Answer the usual eight**, then **Show this clause**.
-4. Open Lumen Health → **Changes** for the privacy diff.
+1. `npm run lab`. That installs if needed and opens http://127.0.0.1:44731.
+2. Press **Walk the three beats**. Northwind’s banner says the files allow AI training and the terms forbid it.
+3. Press **Next beat** for Lumen’s privacy diff, then again for Sable Ferry and **Show the cloud route**.
+4. Press **Answer the usual eight**, then **Show this clause**.
 5. Optional: copy `.env.example` to `.env.local`, add a Firebase web app and an App Check reCAPTCHA Enterprise site key, restart, and confirm the badge says On-device or Cloud.
 
 ## What’s not in this submission

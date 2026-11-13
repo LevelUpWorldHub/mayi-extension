@@ -8,23 +8,28 @@ import {
   getAI,
   getGenerativeModel,
   GoogleAIBackend,
+  HarmBlockThreshold,
+  HarmCategory,
   InferenceMode,
   InferenceSource,
   Schema,
+  ThinkingLevel,
   type GenerativeModel,
+  type InferenceMode as InferenceModeValue,
 } from "firebase/ai";
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { locateQuote } from "./citation";
+import { CLOUD_CHAR_BUDGET, LONG_DOCUMENT_CHARS, ON_DEVICE_CHAR_BUDGET } from "./budgets";
+import { groundModelQuote, locateQuote } from "./citation";
 import { selectChunks, type RankedExcerpt } from "./chunk";
+import { HYBRID_SYSTEM, selectHybridMode, type HybridModeName } from "./hybrid-plan";
+import { shouldRetryInCloud } from "./route";
 import { classifySentence } from "./extractive";
 import { buildAskPrompt } from "./prompts";
 import { presetById } from "./presets";
 import type { Answer, InferencePath, PolicyDoc, Verdict } from "./types";
 
 const CLOUD_MODEL = "gemini-3.5-flash-lite";
-export const ON_DEVICE_CHAR_BUDGET = 6_000;
-export const CLOUD_CHAR_BUDGET = 18_000;
-export const LONG_DOCUMENT_CHARS = 12_000;
+export { CLOUD_CHAR_BUDGET, LONG_DOCUMENT_CHARS, ON_DEVICE_CHAR_BUDGET };
 
 export type AppCheckMode = "recaptcha-enterprise" | "debug" | "extension-bridge" | "not-configured";
 
@@ -45,6 +50,28 @@ let status: FirebaseStatus = {
   cloudModel: CLOUD_MODEL,
 };
 let deviceInit: Promise<void> | null = null;
+let deviceReady = false;
+let deviceBroken = false;
+
+const REQUEST = { timeout: 20_000 };
+
+const HARM_CATEGORIES = [
+  HarmCategory.HARM_CATEGORY_HARASSMENT,
+  HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+  HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+  HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+] as const;
+
+const RESPONSE_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    verdict: { type: "string", enum: ["yes", "no", "conditional", "unknown"] },
+    reason: { type: "string" },
+    quote: { type: "string" },
+    sourceTitle: { type: "string" },
+  },
+  required: ["verdict", "reason", "quote", "sourceTitle"],
+};
 
 const answerSchema = Schema.object({
   properties: {
@@ -142,31 +169,61 @@ export function initFirebase(): FirebaseStatus {
   return status;
 }
 
-function modelFor(mode: (typeof InferenceMode)[keyof typeof InferenceMode]): GenerativeModel {
+function toMode(mode: HybridModeName): InferenceModeValue {
+  if (mode === "only_on_device") return InferenceMode.ONLY_ON_DEVICE;
+  if (mode === "only_in_cloud") return InferenceMode.ONLY_IN_CLOUD;
+  if (mode === "prefer_in_cloud") return InferenceMode.PREFER_IN_CLOUD;
+  return InferenceMode.PREFER_ON_DEVICE;
+}
+
+function modelFor(mode: HybridModeName): GenerativeModel {
   if (!app) throw new Error("Firebase is not configured.");
   const ai = getAI(app, { backend: new GoogleAIBackend() });
-  return getGenerativeModel(ai, {
-    mode,
-    inCloudParams: {
-      model: CLOUD_MODEL,
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 512,
-        responseMimeType: "application/json",
-        responseSchema: answerSchema,
+  return getGenerativeModel(
+    ai,
+    {
+      mode: toMode(mode),
+      onDeviceParams: {
+        createOptions: {
+          expectedInputs: [{ type: "text", languages: ["en"] }],
+          expectedOutputs: [{ type: "text", languages: ["en"] }],
+          initialPrompts: [{ role: "system", content: [{ type: "text", value: HYBRID_SYSTEM }] }],
+        },
+        promptOptions: { responseConstraint: RESPONSE_JSON_SCHEMA },
+      },
+      inCloudParams: {
+        model: CLOUD_MODEL,
+        systemInstruction: HYBRID_SYSTEM,
+        safetySettings: HARM_CATEGORIES.map((category) => ({
+          category,
+          threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        })),
+        generationConfig: {
+          maxOutputTokens: 512,
+          responseMimeType: "application/json",
+          responseSchema: answerSchema,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+        },
       },
     },
-  });
+    REQUEST,
+  );
 }
 
 export function prepareOnDeviceModel(onProgress?: (value: number) => void): Promise<void> {
   initFirebase();
   if (!app) return Promise.resolve();
   if (!deviceInit) {
-    deviceInit = modelFor(InferenceMode.PREFER_ON_DEVICE)
+    deviceInit = modelFor("prefer_on_device")
       .initializeDeviceModel(onProgress)
+      .then(() => {
+        deviceReady = true;
+        deviceBroken = false;
+      })
       .catch((error: unknown) => {
         deviceInit = null;
+        deviceReady = false;
+        deviceBroken = true;
         throw error;
       });
   }
@@ -203,29 +260,75 @@ function sourceOf(value: unknown): InferencePath {
   return "unreported";
 }
 
-async function generate(
-  mode: (typeof InferenceMode)[keyof typeof InferenceMode],
-  question: string,
-  excerpts: RankedExcerpt[],
-): Promise<{ parsed: ModelJson; inference: InferencePath }> {
-  const result = await modelFor(mode).generateContent(buildAskPrompt(question, excerpts));
-  const parsed = parseModelJson(result.response.text());
-  if (!parsed) throw new Error("The model did not return the expected JSON.");
-  return { parsed, inference: sourceOf(result.response.inferenceSource) };
+interface ModelRead {
+  text: string;
+  inference: InferencePath;
+  promptTokens: number | null;
+  outputTokens: number | null;
 }
 
-function cite(parsed: ModelJson, docs: PolicyDoc[]): { doc: PolicyDoc | null; quote: string | null } {
-  if (!parsed.quote) return { doc: null, quote: null };
-  const ordered = [
-    ...docs.filter((doc) => doc.title === parsed.sourceTitle),
-    ...docs.filter((doc) => doc.title !== parsed.sourceTitle),
-  ];
-  for (const doc of ordered) {
-    const located = locateQuote(doc.text, parsed.quote);
-    if (located.method === "none") continue;
-    return { doc, quote: located.matched };
+function readUsage(response: { inferenceSource?: unknown; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }, text: string): ModelRead {
+  const usage = response.usageMetadata;
+  return {
+    text,
+    inference: sourceOf(response.inferenceSource),
+    promptTokens: typeof usage?.promptTokenCount === "number" ? usage.promptTokenCount : null,
+    outputTokens: typeof usage?.candidatesTokenCount === "number" ? usage.candidatesTokenCount : null,
+  };
+}
+
+async function readModel(model: GenerativeModel, prompt: string): Promise<ModelRead> {
+  try {
+    const streaming = await model.generateContentStream(prompt);
+    const aggregated = await streaming.response;
+    return readUsage(aggregated, aggregated.text());
+  } catch {
+    const once = await model.generateContent(prompt);
+    return readUsage(once.response, once.response.text());
   }
-  return { doc: null, quote: null };
+}
+
+async function complete(mode: HybridModeName, prompt: string): Promise<ModelRead & { parsed: ModelJson; mode: HybridModeName }> {
+  const model = modelFor(mode);
+  let read = await readModel(model, prompt);
+  let parsed = parseModelJson(read.text);
+  if (!parsed) {
+    const chat = model.startChat();
+    const first = await chat.sendMessage(prompt);
+    read = readUsage(first.response, first.response.text());
+    parsed = parseModelJson(read.text);
+    if (!parsed) {
+      const repair = await chat.sendMessage("The previous reply was not the JSON object. Return only that JSON.");
+      read = readUsage(repair.response, repair.response.text());
+      parsed = parseModelJson(read.text);
+    }
+    await chat.getHistory().catch(() => []);
+  }
+  if (!parsed) throw new Error("The model did not return the expected JSON.");
+  return { ...read, parsed, mode };
+}
+
+async function generate(mode: HybridModeName, prompt: string): Promise<ModelRead & { parsed: ModelJson; mode: HybridModeName }> {
+  try {
+    return await complete(mode, prompt);
+  } catch (error) {
+    if (mode !== "only_on_device") throw error;
+    deviceReady = false;
+    deviceBroken = true;
+    deviceInit = null;
+    return complete("prefer_in_cloud", prompt);
+  }
+}
+
+function cite(
+  parsed: ModelJson,
+  docs: PolicyDoc[],
+  excerpts: RankedExcerpt[],
+): { doc: PolicyDoc | null; quote: string | null } {
+  const grounded = groundModelQuote(excerpts, docs, parsed.quote, parsed.sourceTitle);
+  if (!grounded.quote) return { doc: null, quote: null };
+  const doc = docs.find((item) => item.url === grounded.url) ?? null;
+  return { doc, quote: grounded.quote };
 }
 
 export async function askFirebase(options: {
@@ -238,35 +341,54 @@ export async function askFirebase(options: {
   if (!status.configured) throw new Error("Firebase is not configured.");
   const total = options.docs.reduce((sum, doc) => sum + doc.text.length, 0);
   const long = total > LONG_DOCUMENT_CHARS;
-  const first = await generate(
-    InferenceMode.PREFER_ON_DEVICE,
-    options.question,
-    selectChunks(options.docs, options.question, ON_DEVICE_CHAR_BUDGET),
-  );
+  const onDeviceExcerpts = selectChunks(options.docs, options.question, ON_DEVICE_CHAR_BUDGET);
+  const onDevicePrompt = buildAskPrompt(options.question, onDeviceExcerpts);
+  let countedTokens: number | null = null;
+  try {
+    countedTokens = (await modelFor("only_in_cloud").countTokens(onDevicePrompt)).totalTokens;
+  } catch {
+    countedTokens = null;
+  }
+  const choice = selectHybridMode({
+    deviceReady,
+    deviceBroken,
+    promptTokens: countedTokens,
+    forceCloud: false,
+  });
+  let excerpts = onDeviceExcerpts;
+  let first = await generate(choice.mode, onDevicePrompt);
   let parsed = first.parsed;
   let inference = first.inference;
-  let detail =
-    inference === "on_device"
-      ? long
-        ? "On-device — Gemini Nano read an excerpt picked on this device so the prompt fits Nano."
-        : "On-device — Gemini Nano."
-      : inference === "cloud"
-        ? long
-          ? "Cloud — the policy is long enough that Firebase used the cloud model."
-          : "Cloud — Gemini Nano isn't available in this browser, so Firebase used the cloud model."
-        : "Firebase answered, and did not say whether Nano or the cloud ran it.";
+  let mode: HybridModeName = first.mode;
+  let detail = choice.reason;
+  if (inference === "on_device" && long) {
+    detail = `${detail} Nano read an excerpt picked on this device.`;
+  }
+  if (inference === "unreported") {
+    detail = `${detail} Firebase did not report whether Nano or the cloud ran it.`;
+  }
 
-  let cited = cite(parsed, options.docs);
-  if (long && (!cited.quote || parsed.verdict === "unknown")) {
-    const second = await generate(
-      InferenceMode.ONLY_IN_CLOUD,
-      options.question,
-      selectChunks(options.docs, options.question, CLOUD_CHAR_BUDGET),
-    );
-    parsed = second.parsed;
+  let cited = cite(parsed, options.docs, excerpts);
+  const retry = shouldRetryInCloud({
+    totalChars: total,
+    onDeviceExcerpt: onDeviceExcerpts.map((excerpt) => excerpt.text).join("\n"),
+    quote: cited.quote,
+    verdict: parsed.verdict,
+  });
+  if (retry) {
+    excerpts = selectChunks(options.docs, options.question, CLOUD_CHAR_BUDGET);
+    const cloudChoice = selectHybridMode({
+      deviceReady,
+      deviceBroken,
+      promptTokens: countedTokens,
+      forceCloud: true,
+    });
+    first = await generate(cloudChoice.mode, buildAskPrompt(options.question, excerpts));
+    parsed = first.parsed;
     inference = "cloud";
-    cited = cite(parsed, options.docs);
-    detail = "Cloud — labeled because the on-device excerpt did not contain a clause MayI could cite, and the policy is long.";
+    mode = first.mode;
+    cited = cite(parsed, options.docs, excerpts);
+    detail = cloudChoice.reason;
   }
 
   const intent = presetById(options.presetId);
@@ -296,6 +418,16 @@ export async function askFirebase(options: {
     sourceTitle: cited.doc?.title ?? null,
     citation: citation && citation.method !== "none" ? citation : null,
     inference,
-    inferenceDetail: detail,
+    inferenceDetail: tokenDetail(detail, countedTokens, first.outputTokens),
+    promptTokens: countedTokens ?? first.promptTokens,
+    outputTokens: first.outputTokens,
+    hybridMode: mode,
   };
+}
+
+function tokenDetail(detail: string, promptTokens: number | null, outputTokens: number | null): string {
+  const parts = [detail];
+  if (promptTokens !== null) parts.push(`Prompt: ${promptTokens} tokens.`);
+  if (outputTokens !== null) parts.push(`Reply: ${outputTokens} tokens.`);
+  return parts.join(" ");
 }

@@ -80,7 +80,10 @@ export function parseAiTxt(text: string): AiTxt {
     result.format = "robots";
     const robots = parseRobots(text);
     const decision = robotsDecision(robots, "*", "/");
-    result.training = decision === "disallow" ? "deny" : decision === "allow" ? "allow" : "unspecified";
+    // A robots-shaped ai.txt is an opt-out file. Allow: / is not a training grant.
+    const denied = decision === "disallow";
+    result.training = denied ? "deny" : "unspecified";
+    result.scraping = denied ? "deny" : "unspecified";
     return result;
   }
   if (!directiveLike && !text.trim()) return result;
