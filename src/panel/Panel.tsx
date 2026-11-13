@@ -7,6 +7,7 @@ import type { CardModel } from "../lib/card";
 import { permissionMarkdown, renderCardPng } from "../lib/card";
 import type { SiteSnapshot } from "../lib/collect";
 import { detectConflicts, scrapingPosture, trainingPosture, type ConflictItem } from "../lib/conflicts";
+import { countImpact, impactLines } from "../lib/impact";
 import { LONG_DOCUMENT_CHARS } from "../lib/firebase";
 import { firebaseConfigPresent, getFirebaseStatus, initFirebase } from "../lib/firebase";
 import { PRESETS } from "../lib/presets";
@@ -193,12 +194,14 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
     }
   }
 
+  const reading = snapshot && report ? impactLines(countImpact(snapshot, report, answers)) : [];
   const card: CardModel | null = snapshot
     ? {
         host: snapshot.host,
         title: snapshot.title,
         checkedAt: snapshot.fetchedAt,
         conflict: report?.primary && report.primary.severity !== "aligned" ? report.primary.headline : null,
+        reading,
         rows: (answers.length ? answers : []).map((answer) => ({
           question: answer.question,
           verdict: answer.verdict,
@@ -541,6 +544,16 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
 
         {snapshot && tab === "card" ? (
           <div className="space-y-3">
+            {reading.length ? (
+              <div className="rounded-2xl border border-line bg-white/40 px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">This reading</p>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {reading.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {!card?.rows.length ? (
               <p className="text-sm text-muted">Answer the usual eight first. The card is the permission slip you can hand someone.</p>
             ) : (
@@ -605,6 +618,9 @@ function Signals({
   ];
   return (
     <div className="space-y-3">
+      <p className="text-sm">
+        Machine Readiness would stop at these files. CrawlPact does not read the contract. ToS;DR does not highlight the sentence on this page.
+      </p>
       <ul className="space-y-2 text-sm">
         {rows.map(([label, value]) => (
           <li key={label} className="rounded-xl border border-line bg-white/40 px-3 py-2">
@@ -615,7 +631,7 @@ function Signals({
       </ul>
       {items.map((item) => (
         <article key={item.id} className={`rounded-2xl border px-3 py-3 ${severityClass(item.severity)}`}>
-          <p className="text-[11px] font-semibold uppercase tracking-wide">{item.topic} · {item.severity}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide">{item.topic} · {severityLabel(item.severity)}</p>
           <p className="mt-1 font-serif text-base leading-snug">{item.headline}</p>
           <p className="mt-1 text-xs opacity-80">{item.machineSummary}</p>
           {item.policyQuote && item.policyUrl ? (

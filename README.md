@@ -25,7 +25,7 @@ MayI does four things:
 1. **Ask.** Preset questions (scrape, train, commercial use, screenshots, cancel anytime, sell my data, forced arbitration, auto-renewal) and anything you type that starts with “May I…?”. Each answer is Yes, No, or Conditional, one plain sentence, and the exact quoted clause. **Show this clause** scrolls the policy page and highlights that span.
 2. **Conflict.** `robots.txt`, `ai.txt`, `llms.txt`, TDMRep / `tdm-reservation`, and meta `noai` are merged into a posture. If the files allow AI training and the terms forbid it, that sentence is the headline.
 3. **Changes.** Policies are hashed in `chrome.storage.local` (or `localStorage` in the lab). The next time the wording changes, MayI shows the added and removed sentences and names the topic: selling personal information, arbitration, renewal, cancellation, training, scraping, screenshots.
-4. **Card.** A per-site permission card, exported as a PNG or as Markdown.
+4. **Card.** A per-site permission card, exported as a PNG or as Markdown. The card prints the counts for that reading: characters read on the device, machine-readable signals checked, file-versus-contract conflicts, and how many characters were sent to the cloud (zero until a cloud answer actually runs).
 
 Short policies are handled on the device. A document past Gemini Nano’s excerpt budget is chunked; if the on-device answer cannot be tied to a real quote, MayI retries in the cloud and the badge says **Cloud**. A quote the page does not contain is dropped, and the verdict becomes Unknown.
 

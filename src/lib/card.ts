@@ -6,6 +6,7 @@ export interface CardModel {
   checkedAt: number;
   conflict: string | null;
   rows: { question: string; verdict: Verdict; tone: Answer["tone"] }[];
+  reading?: string[];
 }
 
 export function permissionMarkdown(card: CardModel): string {
@@ -23,6 +24,10 @@ export function permissionMarkdown(card: CardModel): string {
   lines.push(`| Question | Verdict |`, `| --- | --- |`);
   for (const row of card.rows) {
     lines.push(`| ${row.question} | ${label(row.verdict)} |`);
+  }
+  if (card.reading?.length) {
+    lines.push(``);
+    for (const line of card.reading) lines.push(`- ${line}`);
   }
   lines.push(``, `Read on-device first. Clauses are quoted from the page.`);
   return lines.join("\n");

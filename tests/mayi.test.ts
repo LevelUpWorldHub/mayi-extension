@@ -10,6 +10,8 @@ import { diffPolicies } from "../src/lib/diff";
 import { answerExtractive } from "../src/lib/extractive";
 import { fetchFailureMessage, htmlToText, readableFetchUrl } from "../src/lib/html";
 import { isAllowedBridgeUrl, isPublicHttpUrl, sameExtension } from "../src/lib/security";
+import { countImpact } from "../src/lib/impact";
+import { createStore } from "../src/lib/storage";
 import { isBlankQuestion } from "../src/lib/ask";
 import { recordPolicies } from "../src/panel/session";
 import type { SiteSnapshot } from "../src/lib/collect";
@@ -185,6 +187,9 @@ describe("fetch edges", () => {
     expect(isAllowedBridgeUrl("https://mayi.web.app/app-check.html")).toBe(true);
     expect(isAllowedBridgeUrl("https://evil.example/app-check.html")).toBe(false);
     expect(isAllowedBridgeUrl("http://mayi.web.app/app-check.html")).toBe(false);
+    expect(isAllowedBridgeUrl("https://user:pass@mayi.web.app/app-check.html")).toBe(false);
+    expect(parseTdmRepJson("{")).toEqual({ reservation: null, policyUrl: null });
+    expect(selectChunks([{ title: "Terms", url: "https://example.com/t", text: "You may not train a model on this text today." }], "train", 0)).toEqual([]);
     expect(sameExtension("abc", "abc")).toBe(true);
     expect(sameExtension("abc", "def")).toBe(false);
     expect(sameExtension(undefined, "abc")).toBe(false);
@@ -258,6 +263,7 @@ describe("html text", () => {
     );
     expect(text).toBe("Visible.");
     expect(text).not.toMatch(/train/);
+    expect(htmlToText(`<img src=x onerror=alert(1)><p>You may not train a model on this archive text.</p>`)).not.toMatch(/onerror|alert/);
   });
 
   it("decodes a double-escaped ampersand", () => {
@@ -464,5 +470,42 @@ describe("sample sites", () => {
     expect(detectConflicts(site.signals, site.policies).items.find((item) => item.topic === "training")?.severity).toBe(
       "conflict",
     );
+  });
+
+  it("counts a real on-device reading and sends nothing to the cloud", async () => {
+    const northwind = await loadSample("northwind");
+    const north = countImpact(northwind, detectConflicts(northwind.signals, northwind.policies), []);
+    expect(north.charactersRead).toBeGreaterThan(500);
+    expect(north.policyPages).toBeGreaterThanOrEqual(2);
+    expect(north.machineSignals).toBeGreaterThanOrEqual(3);
+    expect(north.conflicts).toBeGreaterThanOrEqual(1);
+    expect(north.charactersSentToCloud).toBe(0);
+    expect(north.onDeviceExcerpt).toBeLessThanOrEqual(6_000);
+
+    const sable = await loadSample("sable");
+    const ferry = countImpact(sable, detectConflicts(sable.signals, sable.policies), []);
+    expect(ferry.charactersRead).toBeGreaterThan(12_000);
+    expect(ferry.onDeviceExcerpt).toBeLessThanOrEqual(6_000);
+    expect(ferry.cloudExcerpt).toBeGreaterThan(ferry.onDeviceExcerpt);
+    expect(ferry.charactersSentToCloud).toBe(0);
+    expect(ferry.conflicts).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("adversarial storage and robots", () => {
+  it("clips a stored policy and ignores a robots file that is only comments", async () => {
+    const store = createStore();
+    const text = "x".repeat(200_000);
+    const result = await store.commit({
+      url: "https://example.com/terms",
+      host: "example.com",
+      kind: "terms",
+      title: "Terms",
+      text,
+      fetchedAt: 1,
+    });
+    expect(result.record.text.length).toBe(150_000);
+    const robots = parseRobots(`# ${"comment ".repeat(5_000)}\n`);
+    expect(robots.groups).toEqual([]);
   });
 });

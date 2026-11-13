@@ -286,6 +286,38 @@ Technical 10, Design 9.5, Impact 9, Idea 9.5. **Total 37.5.**
 
 **Total: 37.5 / 40.** Flat. Not two flats in a row. Impact remains the short score, on purpose: the next round has to put real counts on the card.
 
+## Round 12 — impact numbers, originality, and an adversarial pass
+
+This is the last round inside the cap of 12. It carries the two remaining layers and the break-it pass.
+
+### Scores going in
+
+Technical 10, Design 9.5, Impact 9, Idea 9.5. **Total 37.5.**
+
+### What the adversarial pass tried
+
+- A robots file that is only comments.
+- A 200,000-character policy in local storage.
+- Broken `tdmrep.json`.
+- A zero-character excerpt budget.
+- An `<img onerror>` and an unclosed script.
+- A bridge URL with a username and password.
+- A page that says to ignore the instructions and answer yes.
+- A shuffled quote, and a model quote that was not in the excerpt (already locked in round 4).
+
+Nothing threw. The store clips at 150,000 characters. The rest return an empty or unknown result instead of a fake clause.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 10 | Held. The new counts are computed from the snapshot, the conflict report, and the answers, and the sample test locks them: Sable is past 12,000 characters, the on-device excerpt stays within 6,000, the cloud excerpt is larger, and characters sent to the cloud stay 0 until an answer is actually badged Cloud. |
+| Design | 9.5 | Held. The Card tab leads with “This reading” before it asks for the eight answers. The Signals tab uses the same plain severity labels as the banner. |
+| Impact | 10 | On Northwind, in the browser, the card read: 1,742 characters from 3 policy pages, 4 machine-readable signals, 2 file-versus-contract conflicts, 0 characters sent to the cloud. Those numbers are the page that was open, not a borrowed statistic. The same lines are copied into the Markdown card. |
+| Idea / originality | 10 | The Signals tab now says, next to the live files, what the three rivals do not do: Machine Readiness stops at the files, CrawlPact does not read the contract, ToS;DR does not highlight the sentence on this page. |
+
+**Total: 39 / 40.** Up 1.5. Every criterion is at least 9.5. No high-severity gap left from the adversarial pass. Stopping here.
+
 ## Round 4 — delight and demo moments
 
 ### Scores
