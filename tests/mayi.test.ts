@@ -9,6 +9,7 @@ import { shouldRetryInCloud } from "../src/lib/route";
 import { diffPolicies } from "../src/lib/diff";
 import { answerExtractive } from "../src/lib/extractive";
 import { fetchFailureMessage, htmlToText, readableFetchUrl } from "../src/lib/html";
+import { isAllowedBridgeUrl, isPublicHttpUrl, sameExtension } from "../src/lib/security";
 import { isBlankQuestion } from "../src/lib/ask";
 import { recordPolicies } from "../src/panel/session";
 import type { SiteSnapshot } from "../src/lib/collect";
@@ -178,6 +179,15 @@ describe("fetch edges", () => {
     expect(readableFetchUrl("https://example.com/terms")).toBe("https://example.com/terms");
     expect(() => readableFetchUrl("javascript:alert(1)")).toThrow(/http and https/);
     expect(() => readableFetchUrl("file:///etc/passwd")).toThrow(/http and https/);
+    expect(() => readableFetchUrl("https://user:pass@example.com/terms")).toThrow(/password/);
+    expect(isPublicHttpUrl("https://example.com/terms")).toBe(true);
+    expect(isPublicHttpUrl("https://user:pass@example.com/terms")).toBe(false);
+    expect(isAllowedBridgeUrl("https://mayi.web.app/app-check.html")).toBe(true);
+    expect(isAllowedBridgeUrl("https://evil.example/app-check.html")).toBe(false);
+    expect(isAllowedBridgeUrl("http://mayi.web.app/app-check.html")).toBe(false);
+    expect(sameExtension("abc", "abc")).toBe(true);
+    expect(sameExtension("abc", "def")).toBe(false);
+    expect(sameExtension(undefined, "abc")).toBe(false);
   });
 
   it("treats a bare May I as no question", () => {

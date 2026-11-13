@@ -17,7 +17,7 @@ export function highlightQuote(doc: Document, quote: string): boolean {
     parent.replaceChild(doc.createTextNode(existing.textContent ?? ""), existing);
     parent.normalize();
   }
-  if (!doc.body) return false;
+  if (!doc.body || quote.length > 2_000) return false;
 
   const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
   const ranges: { node: Text; start: number }[] = [];

@@ -574,7 +574,7 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
       <footer className="border-t border-line px-4 py-2 text-[11px] leading-relaxed text-muted">
         {status.configured
           ? `Firebase hybrid · cloud model ${status.cloudModel} · App Check ${status.appCheck}. `
-          : "Policies are read on this device. Add Firebase config to turn on Gemini Nano, with the cloud used only as fallback. "}
+          : "Policy text stays in local storage on this device. Add Firebase config to turn on Gemini Nano. The cloud, when it runs, receives an excerpt and the badge says Cloud. "}
         Not legal advice.
       </footer>
     </section>

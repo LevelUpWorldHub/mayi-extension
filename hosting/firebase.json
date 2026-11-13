@@ -8,8 +8,10 @@
         "headers": [
           {
             "key": "Content-Security-Policy",
-            "value": "default-src 'self'; script-src 'self' https://www.gstatic.com https://www.google.com https://www.recaptcha.net; frame-src https://www.google.com https://www.recaptcha.net; connect-src https://*.googleapis.com https://www.google.com https://www.recaptcha.net; style-src 'self' 'unsafe-inline'"
-          }
+            "value": "default-src 'self'; script-src 'self' https://www.gstatic.com https://www.google.com https://www.recaptcha.net; frame-src https://www.google.com https://www.recaptcha.net; frame-ancestors chrome-extension:; connect-src https://*.googleapis.com https://www.google.com https://www.recaptcha.net; style-src 'self' 'unsafe-inline'; base-uri 'none'"
+          },
+          { "key": "Referrer-Policy", "value": "no-referrer" },
+          { "key": "X-Content-Type-Options", "value": "nosniff" }
         ]
       }
     ]

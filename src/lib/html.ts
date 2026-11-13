@@ -128,6 +128,10 @@ export function readableFetchUrl(url: string): string {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new Error("MayI only fetches http and https pages.");
   }
+  if (parsed.username || parsed.password) {
+    throw new Error("MayI will not send a fetch that contains a username or password.");
+  }
+  parsed.hash = "";
   return parsed.href;
 }
 

@@ -236,6 +236,31 @@ Technical 9.5, Design 9.5, Impact 9, Idea 9.5. **Total 37.**
 
 **Total: 37 / 40.** Flat, and not two flats in a row. No high-severity contrast gap left. Impact is still the short score.
 
+## Round 10 — security and privacy
+
+### Scores
+
+Technical 9.5, Design 9.5, Impact 9, Idea 9.5. **Total 37.**
+
+### Top 5 gaps
+
+1. The offscreen document accepted an App Check token from any window that knew the origin, not only the bridge iframe.
+2. The bridge URL was whatever the env var said, including plain http or an unrelated host.
+3. “Show this clause” would navigate the active tab to any URL, including one with embedded credentials.
+4. Message listeners did not check that the sender was this extension.
+5. The footer did not say that a cloud call sends an excerpt, or that the text stays in local storage.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 10 | The bridge has to be https on `.web.app` or `.firebaseapp.com`. Token messages must come from that iframe. Clause navigation is http(s) only, with no userinfo, and quotes over 2,000 characters are refused. Listeners ignore other extensions. Fetches with a username or password are refused. The hosting page sends no referrer and cannot be framed by a normal website. |
+| Design | 9.5 | Unchanged. |
+| Impact | 9 | The footer now says the text stays on device and a cloud call is an excerpt with a Cloud badge. The counted story is still not on the card. |
+| Idea / originality | 9.5 | Unchanged. |
+
+**Total: 37.5 / 40.** Up 0.5. Impact is the only score under 9.5. No high-severity security gap left in the extension surface.
+
 ## Round 4 — delight and demo moments
 
 ### Scores

@@ -34,6 +34,6 @@
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; frame-src 'self' https://*.web.app https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://firebaselogging.googleapis.com https://firebaseinstallations.googleapis.com https://firebase.googleapis.com"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; base-uri 'none'; frame-src 'self' https://*.web.app https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://firebaselogging.googleapis.com https://firebaseinstallations.googleapis.com https://firebase.googleapis.com"
   }
 }
