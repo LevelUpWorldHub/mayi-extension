@@ -6,6 +6,14 @@ Machine-readable files already say what a crawler may do. The contract often say
 
 This is an entry for Google’s [#BuildHybridAI](https://devpost.com) hackathon. Judging closes Monday, November 30, 2026, 2:00 PM PT. It is a reading aid, not legal advice.
 
+## Try it
+
+```bash
+npm run lab
+```
+
+That installs dependencies the first time and serves the lab at <http://127.0.0.1:44731>. No Firebase keys. Press **Walk the three beats**: Northwind (files versus the contract), Lumen (the privacy diff), Sable Ferry (the clause past Gemini Nano). The badge says **Local reading** until `.env.local` is filled in from `.env.example`.
+
 ## The problem
 
 [Machine Readiness](https://machinereadiness.com/permission) reports what `robots.txt`, `ai.txt`, and TDM headers allow. [CrawlPact](https://crawlpact.com) audits a site’s declared crawler policy — `robots.txt`, meta robots, `X-Robots-Tag`, `llms.txt`, RSL, Content Signals — against a versioned crawler list. It does not run a model and it does not read the human contract. [ToS;DR](https://tosdr.org) crowdsources consumer-rights grades of terms.
@@ -52,8 +60,8 @@ flowchart LR
   Files --> Panel
   Panel --> Parse
   Parse --> Store
-  Panel -->|PREFER_ON_DEVICE| Nano
-  Nano -->|on-device excerpt missed the clause| Cloud
+  Panel -->|countTokens, then a hybrid mode| Nano
+  Nano -->|excerpt missed the clause, or the prompt is over budget| Cloud
   Panel --> Off
   Off --> Bridge
   Bridge --> Check
@@ -83,15 +91,37 @@ import { getAI, getGenerativeModel, GoogleAIBackend, InferenceMode } from "fireb
 
 const ai = getAI(app, { backend: new GoogleAIBackend() });
 const model = getGenerativeModel(ai, {
-  mode: InferenceMode.PREFER_ON_DEVICE,
-  inCloudParams: { model: "gemini-3.5-flash-lite" },
+  mode: InferenceMode.ONLY_ON_DEVICE, // or PREFER_ON_DEVICE, ONLY_IN_CLOUD, PREFER_IN_CLOUD
+  onDeviceParams: {
+    createOptions: { expectedInputs: [{ type: "text", languages: ["en"] }] },
+    promptOptions: { responseConstraint: jsonSchema },
+  },
+  inCloudParams: {
+    model: "gemini-3.5-flash-lite",
+    systemInstruction,
+    generationConfig: { responseMimeType: "application/json", responseSchema, thinkingConfig: { thinkingLevel: "MINIMAL" } },
+  },
 });
 await model.initializeDeviceModel(onProgress); // from a user gesture
-const result = await model.generateContent(prompt);
-result.response.inferenceSource; // "on_device" or "in_cloud"
+const counted = await model.countTokens(prompt);
+const streamed = await model.generateContentStream(prompt);
+const result = await streamed.response;
+result.inferenceSource; // "on_device" or "in_cloud"
+result.usageMetadata;
 ```
 
-- Chrome 139+ desktop can run Gemini Nano. `PREFER_ON_DEVICE` uses it when the model is downloaded and falls back to the cloud when it is not.
+The mode is chosen in `src/lib/hybrid-plan.ts`, not hardcoded:
+
+| Situation | Mode |
+| --- | --- |
+| Nano has not been initialized yet | `PREFER_ON_DEVICE` |
+| Nano is ready and `countTokens` fits the on-device budget | `ONLY_ON_DEVICE` |
+| The on-device excerpt has no citable clause, or the token count is over budget | `ONLY_IN_CLOUD` |
+| `initializeDeviceModel` failed | `PREFER_IN_CLOUD` |
+
+A reply that is not JSON gets one `startChat` repair turn. If the stream fails, the same prompt is sent with `generateContent`.
+
+- Chrome 139+ desktop can run Gemini Nano. `PREFER_ON_DEVICE` uses it when the model is downloaded and falls back to the cloud when it is not. `ONLY_ON_DEVICE` is used only after Nano has initialized, so a missing model does not fail the question: that failure flips the session to `PREFER_IN_CLOUD`.
 - On-device context is about 9,216 tokens. MayI sends at most ~6,000 characters of ranked excerpts, and the cloud retry may send about 18,000. Past 12,000 characters, a clause that is missing from the on-device excerpt triggers one cloud retry. The badge on that answer says **Cloud**. Sable Ferry is the sample that shows this: without Firebase keys the card says **Cloud route** and still quotes the real sentence from the full page.
 - The displayed quote must be a real span from the page (`locateQuote`). A preset classifier can correct the verdict when it disagrees with the model about that span.
 - With no Firebase config, MayI still answers. That path is a local clause matcher. The badge says **Local reading**. It is not Gemini.
@@ -132,12 +162,12 @@ Not in this entry. Firebase AI Logic’s `prefer_on_device` mode is the same ide
 Requirements: Node 22+, Chrome 139+ if you want Gemini Nano. The lab runs without Chrome and without Firebase keys.
 
 ```bash
-npm install
-npm test
-npm run dev
+npm run lab
 ```
 
-Open [the lab](http://127.0.0.1:44731). `npm install` uses legacy peer deps (see `.npmrc`) because npm 10’s installer crashes on Vitest’s optional peer graph.
+That is the one command. It runs `npm install` when `node_modules` is missing, then serves [the lab](http://127.0.0.1:44731). `npm install` uses legacy peer deps (see `.npmrc`) because npm 10’s installer crashes on Vitest’s optional peer graph.
+
+`npm test` and `npm run dev` are still there if you want them separately.
 
 Load the extension:
 

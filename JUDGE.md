@@ -261,6 +261,31 @@ Technical 9.5, Design 9.5, Impact 9, Idea 9.5. **Total 37.**
 
 **Total: 37.5 / 40.** Up 0.5. Impact is the only score under 9.5. No high-severity security gap left in the extension surface.
 
+## Round 11 — docs and one-click install
+
+### Scores
+
+Technical 10, Design 9.5, Impact 9, Idea 9.5. **Total 37.5.**
+
+### Top 5 gaps
+
+1. Install was three commands, and the first screen did not say to press Walk the three beats.
+2. The architecture diagram still said every call was `PREFER_ON_DEVICE`.
+3. The README code sample omitted `countTokens`, on-device constraints, streaming, and the other three modes.
+4. `DEMO_SCRIPT.md` never shot Sable or the for-you line.
+5. `SUBMISSION.md` still described a single prefer-on-device call.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 10 | Unchanged. The README now matches the code: the mode table, the stream, and the repair turn. |
+| Design | 9.5 | Unchanged. |
+| Impact | 9 | Held. `npm run lab` is one command and the shot list includes Sable, but the panel still does not print how much it read. |
+| Idea / originality | 9.5 | Held. The comparison table was already there. The docs now tell a judge how to see the disagreement in three beats. |
+
+**Total: 37.5 / 40.** Flat. Not two flats in a row. Impact remains the short score, on purpose: the next round has to put real counts on the card.
+
 ## Round 4 — delight and demo moments
 
 ### Scores
