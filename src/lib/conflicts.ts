@@ -26,10 +26,23 @@ export interface ConflictItem {
   severity: "conflict" | "tension" | "aligned" | "gap";
   headline: string;
   machineSummary: string;
+  machineBrief: string;
   policySummary: string;
   policyQuote: string | null;
   policyUrl: string | null;
   policyTitle: string | null;
+}
+
+const BOT_LINE = /GPTBot|ClaudeBot|Google-Extended|CCBot|Applebot|Bytespider|Diffbot|anthropic-ai|cohere-ai/;
+
+export function briefSignals(because: string[]): string {
+  const lead = because.filter((line) => !BOT_LINE.test(line));
+  const picked = (lead.length ? lead : because).slice(0, 2);
+  if (!picked.length) return "No machine-readable signal.";
+  const text = picked.join(". ").replace(/\.\s*\./g, ".");
+  const sentence = /[.!?]$/.test(text) ? text : `${text}.`;
+  const rest = because.length - picked.length;
+  return rest > 0 ? `${sentence} ${rest} more on the Signals tab.` : sentence;
 }
 
 export interface ConflictReport {
@@ -173,6 +186,7 @@ function item(
     severity: level,
     headline: headline(topic, machine.value, policy.value, level),
     machineSummary: machine.because.join(" · "),
+    machineBrief: briefSignals(machine.because),
     policySummary: policy.value === "silent" ? "No matching clause in the pages MayI read." : policy.reason,
     policyQuote: policy.quote,
     policyUrl: policy.url,

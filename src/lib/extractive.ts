@@ -97,7 +97,8 @@ export function answerWithIntent(intent: Intent, docs: PolicyDoc[], inferenceDet
     intent,
     ranked.flatMap((item) => (item.verdict ? [{ verdict: item.verdict }] : [])),
   );
-  const supporting = ranked.find((item) => item.verdict === verdict) ?? top;
+  const sameVerdict = ranked.filter((item) => item.verdict === verdict);
+  const supporting = sameVerdict.find((item) => item.text.length <= 320) ?? sameVerdict[0] ?? top;
   const citation = locateQuote(supporting.doc.text, supporting.text);
   return {
     id: crypto.randomUUID(),

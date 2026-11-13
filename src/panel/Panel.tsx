@@ -241,7 +241,7 @@ export function Panel({ snapshot, changes, loading, error, fetcher, onShowClause
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <div className="rounded-xl bg-white/50 px-3 py-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide">Files</p>
-              <p className="mt-1">{report.primary.machineSummary}</p>
+              <p className="mt-1">{report.primary.machineBrief}</p>
             </div>
             <div className="rounded-xl bg-white/50 px-3 py-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide">Contract</p>

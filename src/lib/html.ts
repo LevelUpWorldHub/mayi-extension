@@ -37,7 +37,8 @@ export function htmlToText(html: string): string {
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
     .replace(/<svg[\s\S]*?<\/svg>/gi, " ");
   const withBreaks = withoutDanger
-    .replace(/<\/(p|div|h1|h2|h3|h4|li|tr|section|article|blockquote|br)>/gi, "\n")
+    .replace(/<(p|div|h1|h2|h3|h4|li|tr|section|article|blockquote|br)\b[^>]*>/gi, "\n")
+    .replace(/<\/(p|div|h1|h2|h3|h4|li|tr|section|article|blockquote)>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, " ");
   const decoded = decodeEntities(withBreaks)
@@ -119,7 +120,11 @@ export function headerMap(headers: Headers): Record<string, string> {
 
 export async function httpFetcher(url: string): Promise<FetchResult> {
   try {
-    const response = await fetch(url, { credentials: "omit", redirect: "follow" });
+    const response = await fetch(url, {
+      credentials: "omit",
+      redirect: "follow",
+      signal: AbortSignal.timeout(12_000),
+    });
     return {
       ok: response.ok,
       status: response.status,

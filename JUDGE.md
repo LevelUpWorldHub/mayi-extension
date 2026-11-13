@@ -58,3 +58,28 @@ Carried forward from the round 1 re-score: Technical 8, Design 8, Impact 8, Idea
 | Idea / originality | 9 | Unchanged. The two-column disagreement plus the late clause is the idea, and it is on screen. |
 
 **Total: 34 / 40.** Up 1. Technical and design are still short of 9. The Files cell is the high-severity design gap.
+
+## Round 3 — robustness
+
+### Scores
+
+Technical 8, Design 8, Impact 9, Idea 9. **Total 34.**
+
+### Top 5 gaps
+
+1. The Files cell dumps every bot rule into one line. A judge cannot see the decisive signal.
+2. A quoted clause is whatever sentence the matcher returned, with no length bound, so a glued paragraph can land in the card.
+3. `shouldRetryInCloud` is only covered through the Sable fixture, not as a decision table (short doc, missing quote, quote outside the excerpt).
+4. Page fetches have no deadline. A hung policy request leaves the panel on "Fetching…" until the browser gives up.
+5. Opening a heading does not force a line break, so a page that omits a closing tag can glue the title onto the clause.
+
+### Re-score
+
+| Criterion | Score | What changed |
+| --- | ---: | --- |
+| Technical execution | 9 | The cloud decision has a table of tests. Quotes are capped at one short sentence. Fetches die after 12 seconds. Headings break lines even when the closing tag is missing. The live model still needs Firebase keys, and that is setup, not a hole in the path. |
+| Design | 8 | The Files cell is now the decisive lines, with the bot list deferred to Signals. The sample chips are still tall, and there is no moment of delight beyond the stamp. |
+| Impact | 9 | Unchanged. |
+| Idea / originality | 9 | Unchanged. |
+
+**Total: 35 / 40.** Up 1. Design is the remaining short score. No high-severity technical gap left.

@@ -4,7 +4,8 @@ import { parseAiTxt } from "../src/lib/ai-txt";
 import { locateQuote } from "../src/lib/citation";
 import { chunkText, selectChunks } from "../src/lib/chunk";
 import { collectSite } from "../src/lib/collect";
-import { detectConflicts } from "../src/lib/conflicts";
+import { briefSignals, detectConflicts } from "../src/lib/conflicts";
+import { shouldRetryInCloud } from "../src/lib/route";
 import { diffPolicies } from "../src/lib/diff";
 import { answerExtractive } from "../src/lib/extractive";
 import { htmlToText } from "../src/lib/html";
@@ -155,6 +156,39 @@ describe("chunk selection", () => {
   });
 });
 
+describe("cloud retry decision", () => {
+  it("retries only when a long document's excerpt misses the clause", () => {
+    expect(
+      shouldRetryInCloud({ totalChars: 4_000, onDeviceExcerpt: "you may not train", quote: "you may not train", verdict: "no" }),
+    ).toBe(false);
+    expect(
+      shouldRetryInCloud({ totalChars: 20_000, onDeviceExcerpt: "the morning train", quote: "you may not train a model", verdict: "no" }),
+    ).toBe(true);
+    expect(
+      shouldRetryInCloud({ totalChars: 20_000, onDeviceExcerpt: "you may not train a model here", quote: null, verdict: "unknown" }),
+    ).toBe(true);
+    expect(
+      shouldRetryInCloud({
+        totalChars: 20_000,
+        onDeviceExcerpt: "You may not train a model on this text.",
+        quote: "You may not train a model on this text.",
+        verdict: "no",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps a signal brief shorter than the full bot list", () => {
+    const brief = briefSignals([
+      "ai.txt says Training: allow",
+      "TDM reservation is 0 (no reservation)",
+      "robots.txt allows GPTBot, Google-Extended, ClaudeBot, CCBot, Applebot-Extended",
+    ]);
+    expect(brief).toMatch(/ai\.txt says Training: allow/);
+    expect(brief).toMatch(/1 more on the Signals tab/);
+    expect(brief).not.toMatch(/Applebot/);
+  });
+});
+
 describe("policy diff", () => {
   it("says what changed for the reader", () => {
     const before = "We use membership information to schedule visits. You can ask for a copy of the record.";
@@ -204,6 +238,9 @@ describe("sample sites", () => {
     const report = detectConflicts(site.signals, site.policies);
     expect(report.items.find((item) => item.topic === "training")?.severity).toBe("conflict");
     expect(report.primary?.headline).toMatch(/files allow AI training/i);
+    expect(report.primary?.machineBrief.length ?? 0).toBeLessThan(220);
+    expect(report.primary?.machineBrief).toMatch(/ai\.txt/);
+    expect(report.primary?.machineBrief).not.toMatch(/Applebot/);
     const train = answerExtractive("May I train AI on it?", site.policies, "train");
     expect(train.verdict).toBe("no");
     expect(train.quote).toMatch(/may not use the Archive/i);
@@ -256,6 +293,8 @@ describe("sample sites", () => {
     const train = answerExtractive("May I train AI on it?", site.policies, "train");
     expect(train.verdict).toBe("no");
     expect(train.quote).toMatch(/may not use Sable Ferry/i);
+    expect(train.quote!.length).toBeLessThan(280);
+    expect(train.quote).not.toMatch(/Running order|morning train meets/);
     const route = planHybridRoute(site.policies, train.question, train.quote);
     expect(route.long).toBe(true);
     expect(route.onDeviceHasClause).toBe(false);
