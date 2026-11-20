@@ -1,5 +1,7 @@
 # MayI
 
+**Live demo:** [https://mayi-hybridai.vercel.app](https://mayi-hybridai.vercel.app) (no sign-in; five fictional sample sites built in)
+
 **FinePrint.** A Chrome extension that reads a site’s terms, privacy policy, and license, then answers “May I…?” in one sentence with the clause it used.
 
 Machine-readable files already say what a crawler may do. The contract often says something else. MayI puts those two readings on the same card and flags the fight.

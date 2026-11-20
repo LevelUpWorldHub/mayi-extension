@@ -10,7 +10,7 @@ export interface CardModel {
 }
 
 export function permissionMarkdown(card: CardModel): string {
-  const when = new Date(card.checkedAt).toISOString().slice(0, 10);
+  const when = localDate(card.checkedAt);
   const lines = [
     `# MayI permission card`,
     ``,
@@ -134,4 +134,11 @@ function wrapText(
     }
   }
   if (line) context.fillText(line, x, cursor);
+}
+
+/** YYYY-MM-DD in the reader's own time zone, not UTC. */
+export function localDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }

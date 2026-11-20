@@ -1,0 +1,149 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npx vite build",
+  "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    },
+    {
+      "source": "/samples/lumen",
+      "headers": [
+        {
+          "key": "tdm-reservation",
+          "value": "1"
+        },
+        {
+          "key": "tdm-policy",
+          "value": "https://lumen.example/privacy"
+        }
+      ]
+    },
+    {
+      "source": "/samples/lumen/",
+      "headers": [
+        {
+          "key": "tdm-reservation",
+          "value": "1"
+        },
+        {
+          "key": "tdm-policy",
+          "value": "https://lumen.example/privacy"
+        }
+      ]
+    },
+    {
+      "source": "/samples/lumen/:path*",
+      "headers": [
+        {
+          "key": "tdm-reservation",
+          "value": "1"
+        },
+        {
+          "key": "tdm-policy",
+          "value": "https://lumen.example/privacy"
+        }
+      ]
+    },
+    {
+      "source": "/samples/northwind",
+      "headers": [
+        {
+          "key": "tdm-reservation",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/samples/northwind/",
+      "headers": [
+        {
+          "key": "tdm-reservation",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/samples/northwind/:path*",
+      "headers": [
+        {
+          "key": "tdm-reservation",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/samples/sable",
+      "headers": [
+        {
+          "key": "tdm-reservation",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/samples/sable/",
+      "headers": [
+        {
+          "key": "tdm-reservation",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/samples/sable/:path*",
+      "headers": [
+        {
+          "key": "tdm-reservation",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/samples/pinnacle",
+      "headers": [
+        {
+          "key": "x-robots-tag",
+          "value": "noai, noimageai"
+        }
+      ]
+    },
+    {
+      "source": "/samples/pinnacle/",
+      "headers": [
+        {
+          "key": "x-robots-tag",
+          "value": "noai, noimageai"
+        }
+      ]
+    },
+    {
+      "source": "/samples/pinnacle/:path*",
+      "headers": [
+        {
+          "key": "x-robots-tag",
+          "value": "noai, noimageai"
+        }
+      ]
+    }
+  ]
+}
